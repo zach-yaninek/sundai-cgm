@@ -1,7 +1,10 @@
 # Render blueprint for the API. Connecting the repo is the only manual step.
 #
-# After the first deploy, set VITE_API_BASE on Vercel to this service's URL and
-# add that Vercel URL to ALLOWED_ORIGINS below — the two have to know each other.
+# The API and the frontend have to know each other's names: VITE_API_BASE on
+# Vercel points at this service, and ALLOWED_ORIGINS below points back. Change
+# the origin list HERE rather than in the Render dashboard — the value is
+# literal in this file, so a blueprint sync overwrites whatever the dashboard
+# says and CORS breaks again with nothing in the diff to explain it.
 services:
   - type: web
     name: sundai-cgm-api
@@ -10,9 +13,15 @@ services:
     plan: free
     healthCheckPath: /api/meta
     envVars:
-      # Comma-separated. Add the deployed frontend origin once Vercel gives you one.
+      # Comma-separated, exact origins — scheme and host, no trailing slash and
+      # no path, because CORS matches the Origin header literally.
+      #
+      # Only the production Vercel domain is listed. Preview deploys get a fresh
+      # hostname every time, so a preview will fail CORS against this API; that
+      # is the honest default rather than opening the origin list to a wildcard
+      # on a service that answers questions about people's bloodwork.
       - key: ALLOWED_ORIGINS
-        value: http://localhost:5173,http://127.0.0.1:5173
+        value: http://localhost:5173,http://127.0.0.1:5173,https://sundai-cgm.vercel.app
 
 # Not declared above, but load-bearing: Render sets RENDER_GIT_COMMIT on every
 # service automatically, and serve.py reports it as model_version. Declaring it
