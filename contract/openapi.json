@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "sundai-cgm meal risk API",
-    "version": "1.2.0",
-    "description": "Assess a meal's likely glucose response for one person, suggest changes that lower it, and improve as that person logs meals.\n\nThe server is STATELESS. The client holds the lab panel and the meal history in browser localStorage and sends what is needed on each request; no personal health data is stored server-side.\n\nEvery number here comes from a model fitted to 45 people in one study (CGMacros, PhysioNet 2025). Cold-start AUC for the >140 mg/dL flag is 0.8854 with a pre-meal glucose reading and 0.8358 without. This is not a medical device and must not be used to inform an insulin dose.\n\nv1.2.0 adds /api/lab-value (would drawing this person's bloods sharpen our predictions) and /api/explain (a narration of one assessment, grounded in the model's own feature attributions). The explanation endpoint never receives raw lab values or meal macros \u2014 only attribution magnitudes and figures already shown to the user.",
+    "version": "1.3.0",
+    "description": "Assess a meal's likely glucose response for one person, suggest changes that lower it, and improve as that person logs meals.\n\nThe server is STATELESS. The client holds the lab panel and the meal history in browser localStorage and sends what is needed on each request; no personal health data is stored server-side.\n\nEvery number here comes from a model fitted to 45 people in one study (CGMacros, PhysioNet 2025). Cold-start AUC for the >140 mg/dL flag is 0.8854 with a pre-meal glucose reading and 0.8358 without. This is not a medical device and must not be used to inform an insulin dose.\n\nv1.2.0 adds /api/lab-value (would drawing this person's bloods sharpen our predictions) and /api/explain (a narration of one assessment, grounded in the model's own feature attributions). The explanation endpoint never receives raw lab values or meal macros \u2014 only attribution magnitudes and figures already shown to the user.\n\nv1.3.0 personalises with two parameters rather than one. Once six meals are logged the correction learns a slope as well as an intercept; below that it is the flat offset it always was. Measured leave-one-subject-out, MAE at 15 logged meals falls 23.59 -> 22.63 mg/dL*h against the flat-offset version (paired difference -0.96, 95% CI -2.08 to -0.13). `personalization.learned_slope` says which regime a response is in.",
     "license": {
       "name": "MIT (code); data CC BY-NC-SA 4.0"
     }
@@ -456,7 +456,7 @@
           },
           "offset_applied": {
             "type": "number",
-            "description": "mg/dL*h added to the population prediction for this person."
+            "description": "mg/dL*h added to THIS prediction. Once a slope is learned the correction depends on the size of the prediction being corrected, so this is the offset that was applied here, not a constant for the user."
           },
           "shrinkage": {
             "type": "number",
@@ -467,6 +467,10 @@
           "expected_mae": {
             "type": "number",
             "description": "Expected MAE at this history length, from the leave-one-subject-out curve."
+          },
+          "learned_slope": {
+            "type": "boolean",
+            "description": "True once enough meals are logged to fit a slope as well as an intercept - the model can then express 'understates your large responses' rather than only 'runs low for you'. False below that, where only a flat offset is learned."
           }
         }
       },

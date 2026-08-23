@@ -35,3 +35,92 @@ def offset_from_residuals(residuals, lam: float = LAMBDA) -> float:
         return 0.0
     mean = sum(usable) / len(usable)
     return mean * shrinkage(len(usable), lam)
+
+
+# Below this many logged meals, only an intercept is learned. A two-parameter
+# fit on three points is mostly fitting which three meals happened to be logged,
+# and personalize_compare.py measured exactly that: at k=3 the slope scores 28.00
+# against the intercept-only 25.77, at k=4 26.14 against 25.38, at k=5 they tie,
+# and from k=6 the slope leads (24.43 against 24.74) and never gives it back.
+# Six is where the sweep crossed over, not a round number that looked safe.
+SLOPE_MIN_POINTS = 6
+
+
+class Calibration:
+    """What has been learned about one person, as a correction to any prediction.
+
+    Two parameters against the population model's output:
+
+        corrected = (1 - w) * predicted + w * (intercept + slope * predicted)
+
+    which rearranges to a per-prediction offset of
+    ``w * (intercept + (slope - 1) * predicted)``. An intercept-only calibration
+    is exactly ``slope = 1``, where that collapses to ``w * intercept`` — the
+    scalar correction this module started with — so both regimes are one formula
+    and there is no second code path to keep in step.
+
+    The slope is what an intercept cannot express: not "the model runs 20 low for
+    you" but "the model understates your *large* responses specifically".
+    """
+
+    __slots__ = ("intercept", "slope", "weight", "k")
+
+    def __init__(self, intercept: float = 0.0, slope: float = 1.0,
+                 weight: float = 0.0, k: int = 0):
+        self.intercept = intercept
+        self.slope = slope
+        self.weight = weight
+        self.k = k
+
+    @property
+    def learned_slope(self) -> bool:
+        """Whether this fit has a slope, or is the intercept-only regime."""
+        return self.slope != 1.0
+
+    def offset_for(self, predicted: float) -> float:
+        """mg/dL*h to add to this particular prediction."""
+        return self.weight * (self.intercept + (self.slope - 1.0) * predicted)
+
+    def apply(self, predicted: float) -> float:
+        return predicted + self.offset_for(predicted)
+
+    def __repr__(self) -> str:
+        return (f"Calibration(intercept={self.intercept:.2f}, "
+                f"slope={self.slope:.3f}, weight={self.weight:.3f}, k={self.k})")
+
+
+def fit_calibration(predicted, observed, lam: float = LAMBDA,
+                    min_slope_points: int = SLOPE_MIN_POINTS) -> Calibration:
+    """Learn a person's correction from what the model said and what happened.
+
+    Ordinary least squares, written out rather than imported, so this module
+    stays stdlib-only and the serving container does not gain a dependency to
+    fit two parameters to fifteen points.
+
+    Falls back to intercept-only when there are too few meals to support a slope,
+    and also when the predictions carry no spread — a slope through a vertical
+    stack of points is a division by nearly zero wearing a number's clothing.
+    """
+    pairs = [(float(p), float(o)) for p, o in zip(predicted, observed)
+             if p is not None and o is not None
+             and isfinite(float(p)) and isfinite(float(o))]
+    n = len(pairs)
+    if n == 0:
+        return Calibration()
+
+    weight = shrinkage(n, lam)
+    mean_residual = sum(o - p for p, o in pairs) / n
+
+    if n < min_slope_points:
+        return Calibration(intercept=mean_residual, slope=1.0, weight=weight, k=n)
+
+    mean_p = sum(p for p, _ in pairs) / n
+    variance = sum((p - mean_p) ** 2 for p, _ in pairs)
+    if variance < 1e-9:
+        return Calibration(intercept=mean_residual, slope=1.0, weight=weight, k=n)
+
+    mean_o = sum(o for _, o in pairs) / n
+    covariance = sum((p - mean_p) * (o - mean_o) for p, o in pairs)
+    slope = covariance / variance
+    intercept = mean_o - slope * mean_p
+    return Calibration(intercept=intercept, slope=slope, weight=weight, k=n)

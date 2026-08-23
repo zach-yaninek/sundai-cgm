@@ -161,11 +161,12 @@ def _curve(peak_delta: float) -> list[dict]:
             for i, s in enumerate(shape)]
 
 
-def _assemble(scored: dict, labs: dict, history: list, offset: float,
-              k: int, pre: float | None) -> dict:
+def _assemble(scored: dict, labs: dict, history: list, calibration,
+              pre: float | None) -> dict:
     baseline = pre if pre is not None else labs.get("fasting_glu___pdl_lab")
     peak_delta = scored["predicted_peak_mgdl"] - float(baseline or 97)
     curve = _learning_curve()
+    k = calibration.k
     expected = min(curve, key=lambda p: abs(p["meals_logged"] - k))["mae"] if curve else None
 
     return {
@@ -183,8 +184,13 @@ def _assemble(scored: dict, labs: dict, history: list, offset: float,
                        "the trajectory."),
         "personalization": {
             "meals_logged": k,
-            "offset_applied": round(offset, 1),
+            # The correction actually applied to this prediction, taken from the
+            # scorer rather than recomputed: once a slope is learned the offset
+            # depends on the size of the prediction it is correcting, so there is
+            # no single number that is "the offset" independent of a meal.
+            "offset_applied": scored["offset_applied"],
             "shrinkage": round(shrink.shrinkage(k), 3),
+            "learned_slope": calibration.learned_slope,
             **({"expected_mae": expected} if expected is not None else {}),
         },
         "confidence": {
@@ -258,15 +264,15 @@ def assess(body: dict):
         return _error(problem)
 
     try:
-        offset, k = recommend.personal_offset(labs, history, pre)
-        scored = risk.score(labs, meal, pre, offset=offset)
+        calibration = recommend.personal_calibration(labs, history, pre)
+        scored = risk.score(labs, meal, pre, calibration=calibration)
     except ValueError as exc:
         return _error(str(exc), field="meal", code="invalid_meal")
     except risk.ArtifactError as exc:
         return JSONResponse(status_code=503,
                             content={"error": "artifacts_unavailable",
                                      "detail": str(exc), "field": None})
-    return _assemble(scored, labs, history, offset, k, pre)
+    return _assemble(scored, labs, history, calibration, pre)
 
 
 @app.post("/api/alternatives")
@@ -282,8 +288,8 @@ def alternatives(body: dict):
         return _error(problem)
 
     try:
-        offset, _ = recommend.personal_offset(labs, history, pre)
-        result = recommend.suggest(labs, meal, pre, offset=offset,
+        calibration = recommend.personal_calibration(labs, history, pre)
+        result = recommend.suggest(labs, meal, pre, calibration=calibration,
                                    target_probability=target)
     except ValueError as exc:
         return _error(str(exc), field="meal", code="invalid_meal")
@@ -344,8 +350,8 @@ def explain_assessment(body: dict):
         return _error(problem)
 
     try:
-        offset, _ = recommend.personal_offset(labs, history, pre)
-        assessment = risk.score(labs, meal, pre, offset=offset)
+        calibration = recommend.personal_calibration(labs, history, pre)
+        assessment = risk.score(labs, meal, pre, calibration=calibration)
         result = explain.explain(labs, meal, pre, assessment)
     except ValueError as exc:
         return _error(str(exc), field="meal", code="invalid_meal")

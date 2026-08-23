@@ -152,6 +152,40 @@ Three tabs, one per pillar:
 - **Learning** — the measured learning curve, and a log of what actually happened
   after meals you assessed.
 
+### How it learns a person
+
+Not by retraining. The booster is frozen; what personalises is a correction
+fitted to the gap between what happened to you and what the model predicted:
+
+```
+corrected = (1 - w) * predicted + w * (intercept + slope * predicted)
+w         = k / (k + 5)          # k = meals logged with a real outcome
+```
+
+Below **six** logged meals the slope is pinned at 1, so this is a flat offset —
+"the model runs low for you". At six and above a slope is fitted too, which lets
+it say "the model understates your *large* responses specifically". Measured
+leave-one-subject-out on 39 subjects, MAE falls **28.88 → 22.74** (21%) by 15
+logged meals, against 18% for the flat offset alone.
+
+Six is where the sweep crossed over, not a round number. `personalize_compare.py`
+pits four strategies against each other on identical splits:
+
+| Strategy | MAE @ k=15 | vs flat offset |
+|---|---|---|
+| no personalisation | 28.78 | — |
+| flat offset | 23.59 | — |
+| **slope + intercept** | **22.63** | **−0.96** [−2.08, −0.13] |
+| offset per meal type | 24.06 | +0.47 [−0.59, +1.56] |
+| per-user residual booster | 23.73 | +0.14 [−0.94, +1.14] |
+| per-user booster | 25.69 | +2.10 [+0.34, +3.61] |
+
+**Retraining a model per user is worse than adding one number**, significantly
+so. A booster fitted to someone's own fifteen meals cannot beat the population
+model plus a scalar, which is what an effective n of 45 predicts. Ungated, the
+two-parameter fit is also worse below k=6 (28.00 against 25.77 at k=3) — two
+parameters on three points fit the draw, not the person. Hence the gate.
+
 Under the numbers on the first tab, an **explanation** narrates what drove the
 estimate, built from the model's own SHAP attributions. It labels itself
 `written by Claude` or `standard wording` — the second is a deterministic
@@ -163,10 +197,14 @@ locally", which reads as though a model ran on the machine.
 
 ## Deploying it
 
-`Dockerfile` + `render.yaml` for the API, `web/` on Vercel. The serving image is
-5.6 MB of code and artifacts — it deliberately excludes the training modules,
-which is why the shrinkage maths lives in `shrinkage.py` rather than
-`personalize.py`.
+`Dockerfile` + `render.yaml` for the API, `web/` on Vercel. The serving image
+copies 5.6 MB of code and artifacts and deliberately excludes the training
+modules, which is why the personalisation maths lives in `shrinkage.py` — stdlib
+only, no numpy — rather than in `personalize.py`, which needs pandas and xgboost
+to *measure* the curve. The built image is ~1.2 GB, almost all of it xgboost and
+its CUDA dependencies; it installs `requirements-serve.txt`, not
+`requirements.txt`, because the API never imports pandas, pyarrow, scipy or
+scikit-learn.
 
 The two halves have to learn each other's names, and the order matters:
 

@@ -85,14 +85,16 @@ def apply_edit(meal: dict, changes: dict) -> tuple[dict, dict]:
 
 
 def suggest(labs: dict, meal: dict, pre_meal_glucose: float | None = None, *,
-            offset: float = 0.0, target_probability: float = DEFAULT_TARGET,
+            offset: float = 0.0, calibration=None,
+            target_probability: float = DEFAULT_TARGET,
             max_edits: int = 4) -> dict:
     """Edits that lower this meal's predicted response, gentlest first.
 
     Returns an empty ``edits`` list when the meal is already at or below the
     target. An app that always has a suggestion is inventing one.
     """
-    base = risk.score(labs, meal, pre_meal_glucose, offset=offset)
+    base = risk.score(labs, meal, pre_meal_glucose, offset=offset,
+                      calibration=calibration)
 
     if base["probability"] <= target_probability:
         return {
@@ -108,7 +110,8 @@ def suggest(labs: dict, meal: dict, pre_meal_glucose: float | None = None, *,
         variant_meal, applied = apply_edit(meal, changes)
         if not applied:
             continue
-        scored = risk.score(labs, variant_meal, pre_meal_glucose, offset=offset)
+        scored = risk.score(labs, variant_meal, pre_meal_glucose, offset=offset,
+                            calibration=calibration)
         if scored["probability"] >= base["probability"]:
             continue  # never surface a change that does not help
         edits.append({
@@ -233,17 +236,22 @@ def observed_iauc(entry: dict, labs: dict, scored: dict) -> float | None:
     return max(0.0, observed_peak_delta * ratio)
 
 
-def personal_offset(labs: dict, history: list[dict],
-                    pre_meal_glucose: float | None = None) -> tuple[float, int]:
-    """Shrunk correction from a user's logged outcomes. Returns (offset, k).
+def personal_calibration(labs: dict, history: list[dict],
+                         pre_meal_glucose: float | None = None):
+    """What this person's logged outcomes say about correcting their predictions.
 
-    Each historical meal is re-scored with the population model and compared to
-    what actually happened; the mean gap, shrunk by k/(k+5), is the correction.
+    Each historical meal is re-scored with the population model and paired with
+    what actually happened. Below six such pairs only an intercept is learned -
+    "the model runs low for you" - and above it a slope as well, which can say
+    "the model understates your large responses". Both are shrunk by k/(k+5), so
+    the first meal moves the correction a sixth of the way and never more.
+
     Outcomes logged as a peak are converted to iAUC first - see observed_iauc().
+    Returns a `shrinkage.Calibration`, which is a no-op for an empty history.
     """
     import shrinkage as shrink
 
-    residuals = []
+    predicted, observed = [], []
     for entry in history or []:
         meal = entry.get("meal") or {}
         if not meal.get("carbs") or not meal.get("meal_type"):
@@ -252,9 +260,24 @@ def personal_offset(labs: dict, history: list[dict],
             scored = risk.score(labs, meal, entry.get("pre_meal_glucose"))
         except (ValueError, KeyError):
             continue
-        observed = observed_iauc(entry, labs, scored)
-        if observed is None:
+        actual = observed_iauc(entry, labs, scored)
+        if actual is None:
             continue
-        residuals.append(observed - scored["predicted_iauc"])
+        predicted.append(scored["predicted_iauc"])
+        observed.append(actual)
 
-    return shrink.offset_from_residuals(residuals), len(residuals)
+    return shrink.fit_calibration(predicted, observed)
+
+
+def personal_offset(labs: dict, history: list[dict],
+                    pre_meal_glucose: float | None = None) -> tuple[float, int]:
+    """Intercept-only view of the calibration, as ``(offset, k)``.
+
+    Kept because a flat offset is still the honest summary when no slope was
+    learned, and because it is the shape the learning curve was measured in.
+    Callers that score meals should use `personal_calibration` instead: a slope
+    cannot be collapsed to one number without picking a prediction to collapse
+    it at.
+    """
+    cal = personal_calibration(labs, history, pre_meal_glucose)
+    return cal.weight * cal.intercept, cal.k

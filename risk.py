@@ -169,18 +169,24 @@ def confidence_band(imputed: list[str], pre_meal_glucose: float | None) -> str:
 
 
 def score(labs: dict, meal: dict, pre_meal_glucose: float | None = None,
-          *, offset: float = 0.0) -> dict:
+          *, offset: float = 0.0, calibration=None) -> dict:
     """Full assessment for one meal.
 
-    ``offset`` is the personalisation correction from `personalize.py`, in
-    mg/dL*h. It shifts the iAUC estimate and the peak proportionally, and is 0.0
-    for a user with no logged history.
+    ``offset`` is a flat personalisation correction in mg/dL*h, 0.0 for a user
+    with no logged history. ``calibration`` is the richer form — a
+    `shrinkage.Calibration` that may have learned a slope as well as an
+    intercept, so the correction it applies depends on how large *this*
+    prediction is. When given it supersedes ``offset``, and the correction it
+    produced is reported back as ``offset_applied`` so a caller never has to
+    recompute what was already applied here.
     """
     variant = variant_for(pre_meal_glucose)
     row, imputed = build_row(labs, meal, pre_meal_glucose)
 
-    iauc = float(_predict(variant, "iauc", row)[0]) + offset
-    iauc = max(0.0, iauc)
+    raw_iauc = float(_predict(variant, "iauc", row)[0])
+    if calibration is not None:
+        offset = calibration.offset_for(raw_iauc)
+    iauc = max(0.0, raw_iauc + offset)
     peak = float(_predict(variant, "peak_abs", row)[0])
 
     # A personal offset on the excursion implies a matching shift in the peak.
@@ -197,6 +203,7 @@ def score(labs: dict, meal: dict, pre_meal_glucose: float | None = None,
         "cohort_percentile": cohort_percentile(probability, variant),
         "predicted_iauc": round(iauc, 1),
         "predicted_peak_mgdl": round(peak, 1),
+        "offset_applied": round(offset, 1),
         "variant": variant,
         "imputed_fields": imputed,
         "confidence_band": confidence_band(imputed, pre_meal_glucose),

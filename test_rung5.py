@@ -154,6 +154,48 @@ ok(recommend.observed_iauc({"observed_peak": 90.0, "pre_meal_glucose": 104},
 ok(recommend.observed_iauc({}, RESISTANT, _scored) is None,
    "an entry with neither reading converts to nothing")
 
+# --- two-parameter calibration -------------------------------------------
+# The gate is the load-bearing part. personalize_compare.py measured a
+# two-parameter fit as clearly WORSE than a flat offset below k=6 (28.00 against
+# 25.77 at k=3) and better from k=6 on, so a regression that moves the gate is a
+# regression in accuracy that nothing else would catch.
+import shrinkage as shrink
+
+flat = shrink.fit_calibration([100.0] * 4, [120.0] * 4)
+ok(not flat.learned_slope and flat.k == 4,
+   "below the gate only an intercept is learned")
+ok(abs(flat.offset_for(50.0) - flat.offset_for(500.0)) < 1e-9,
+   "an intercept-only correction is the same whatever it corrects")
+ok(abs(flat.offset_for(100.0) - shrink.offset_from_residuals([20.0] * 4)) < 1e-9,
+   "the intercept-only regime reproduces the old scalar offset exactly")
+
+rising = shrink.fit_calibration([50.0, 80.0, 110.0, 140.0, 170.0, 200.0],
+                                [55.0, 95.0, 135.0, 180.0, 220.0, 265.0])
+ok(rising.learned_slope and rising.k == 6,
+   f"at the gate a slope is learned (slope={rising.slope:.2f})")
+ok(rising.offset_for(200.0) > rising.offset_for(60.0),
+   "a slope corrects large predictions more than small ones")
+
+ok(shrink.fit_calibration([], []).offset_for(120.0) == 0.0,
+   "no history corrects nothing")
+ok(not shrink.fit_calibration([100.0] * 8, [130.0] * 8).learned_slope,
+   "predictions with no spread fall back to intercept-only, not a wild slope")
+
+# End to end through the serving path, since that is where it has to hold.
+cal_hist = [{"meal": {**MEAL, "carbs": c}, "observed_iauc": o, "pre_meal_glucose": 104}
+            for c, o in [(20, 30.0), (40, 70.0), (60, 120.0),
+                         (80, 180.0), (100, 240.0), (120, 300.0)]]
+cal = recommend.personal_calibration(RESISTANT, cal_hist, 104)
+ok(cal.k == 6 and cal.learned_slope,
+   f"six logged meals through the API path learn a slope (k={cal.k})")
+small = risk.score(RESISTANT, {**MEAL, "carbs": 20, "calories": 400}, 104, calibration=cal)
+large = risk.score(RESISTANT, {**MEAL, "carbs": 120, "calories": 1100}, 104, calibration=cal)
+ok(abs(large["offset_applied"]) > abs(small["offset_applied"]),
+   f"the correction scales with the prediction "
+   f"({small['offset_applied']:+.1f} vs {large['offset_applied']:+.1f})")
+ok(risk.score(RESISTANT, MEAL, 104, calibration=shrink.Calibration()) == base,
+   "an empty calibration reproduces the population prediction exactly")
+
 # --------------------------------------------------------------- recommender
 print("\n-- recommender")
 result = recommend.suggest(RESISTANT, MEAL, 104)

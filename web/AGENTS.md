@@ -60,7 +60,7 @@ Six screens. `src/components/` has a stub for each with a TODO.
 | **Risk card** | Probability, cohort band, predicted peak, curve. Use `describeRisk()` from the client for the wording. |
 | **Alternatives** | `edits[]`, smallest effective change first, each with `delta_probability`. `from_your_history[]` is the user's own past low-response meals — empty until they log some. **Empty `edits` means the meal is already in their lower range: say that, don't invent a suggestion.** |
 | **History** | `src/lib/storage.ts` already handles persistence. Log the *observed* outcome the user enters later, never the prediction. Show `personalization.meals_logged` climbing. |
-| **Learning curve** | Plot `meta.performance.learning_curve`. Seven real points measured on held-out people. Cheapest thing in the app and the most convincing. |
+| **Learning curve** | Plot `meta.performance.learning_curve`. Nine real points measured on held-out people, averaged over seven shuffles each. Cheapest thing in the app and the most convincing. The kink at 6 is real: that is where the correction gains a slope. |
 | **Would a test help?** | Value of information. **Never tell a CGM wearer to get a glucose panel** — they already have continuous glucose. Lead with the analytes a draw actually adds: HbA1c and fasting insulin. Score 0 means say so and offer nothing. |
 | **Explanation** | Lazy-loaded under the numbers, so an external call can never delay the assessment. Show `source` — hiding whether Claude or the local template wrote it would misrepresent the system. |
 
@@ -69,8 +69,14 @@ library: two series of under 30 points do not justify ~500 KB, and drawing it
 ourselves is what lets a wide confidence band render as a dashed, faded line.
 
 **`zeroBaseline` matters.** The glucose curve anchors at zero; the learning curve
-must not. Forcing zero there squashes 28.7 → 23.4 into a flat line and hides the
+must not. Forcing zero there squashes 28.9 → 22.7 into a flat line and hides the
 entire effect the chart exists to show.
+
+**`personalization.offset_applied` is per-meal once `learned_slope` is true.**
+Below six logged meals the correction is a flat number; at and above six the
+model has learned how someone's response *scales*, so the same person gets a
+different correction for a small meal than a large one. Do not label it as a
+fixed amount for the user - `RiskCard` says so explicitly when the flag is set.
 
 ## Rules that are not style preferences
 

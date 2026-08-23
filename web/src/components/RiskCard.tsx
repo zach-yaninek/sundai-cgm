@@ -78,6 +78,14 @@ export default function RiskCard({
         </div>
       )}
 
+      {result.personalization?.learned_slope && (
+        <p className="hint">
+          This adjustment is for this meal, not a fixed amount. With enough
+          logged meals the model has learned how your response scales, so it
+          corrects a large meal differently from a small one.
+        </p>
+      )}
+
       {imputed.length > 0 && (
         <p className="imputed">
           {imputed.length} input{imputed.length === 1 ? " was" : "s were"} estimated

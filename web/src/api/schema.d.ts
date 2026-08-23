@@ -367,12 +367,14 @@ export interface components {
         };
         Personalization: {
             meals_logged: number;
-            /** @description mg/dL*h added to the population prediction for this person. */
+            /** @description mg/dL*h added to THIS prediction. Once a slope is learned the correction depends on the size of the prediction being corrected, so this is the offset that was applied here, not a constant for the user. */
             offset_applied: number;
             /** @description k/(k+5). At 0 the prediction is purely population-level. */
             shrinkage: number;
             /** @description Expected MAE at this history length, from the leave-one-subject-out curve. */
             expected_mae?: number;
+            /** @description True once enough meals are logged to fit a slope as well as an intercept - the model can then express 'understates your large responses' rather than only 'runs low for you'. False below that, where only a flat offset is learned. */
+            learned_slope?: boolean;
         };
         Confidence: {
             /**

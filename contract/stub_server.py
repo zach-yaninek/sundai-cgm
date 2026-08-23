@@ -194,6 +194,9 @@ def _personalization(history: list) -> dict:
         "meals_logged": k,
         "offset_applied": round(shrinkage * 12.0, 1),   # fixture direction only
         "shrinkage": round(shrinkage, 3),
+        # Mirrors the real backend's gate so a frontend can reach both regimes
+        # against fixtures: below six logged meals only an intercept is learned.
+        "learned_slope": k >= 6,
         "expected_mae": curve[nearest],
     }
 

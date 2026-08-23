@@ -61,9 +61,11 @@ already in their lower range — say that, don't invent a suggestion.
 **History** — localStorage log of meals and observed outcomes, feeding the
 `history` field. Show `personalization.meals_logged` climbing.
 
-**Learning curve** — plot `meta.performance.learning_curve`. Seven points, real,
+**Learning curve** — plot `meta.performance.learning_curve`. Nine points, real,
 measured on held-out people. Cheap to build and it's the most convincing thing in
-the app.
+the app. It bends at 6 logged meals, where the correction stops being a flat
+offset and gains a slope; `personalization.learned_slope` says which side of that
+a given response is on.
 
 ## Copy rules — these are not style preferences
 
@@ -82,7 +84,7 @@ the app.
 |---|---|
 | Flag AUC | **0.888** with pre-meal glucose, **0.841** without |
 | Cohort | **45 subjects**, 1,382 meals, ages 24–59, one study |
-| Personalisation | **~17% better after 10 logged meals** (MAE 28.4 → 23.8) |
+| Personalisation | **~21% better after 15 logged meals** (MAE 28.9 → 22.7) |
 | Threshold | 140 mg/dL, which **45.8%** of cohort meals exceeded |
 
 All of these come from `/api/meta` — read them from there so they stay true when
