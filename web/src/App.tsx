@@ -30,6 +30,7 @@ import type {
   Meta,
 } from "./api/client";
 import Alternatives from "./components/Alternatives";
+import DeleteData from "./components/DeleteData";
 import Explanation from "./components/Explanation";
 import History from "./components/History";
 import LabValue from "./components/LabValue";
@@ -38,6 +39,7 @@ import MealInput from "./components/MealInput";
 import OnboardLabs from "./components/OnboardLabs";
 import RiskCard from "./components/RiskCard";
 import {
+  clearEverything,
   hasConsented,
   loadHistory,
   loadLabs,
@@ -105,6 +107,24 @@ export default function App() {
     setAlts(null);
     setNarration(null);
     setBloods(null);
+  }, []);
+
+  // Everything, not just the visible parts: storage, and every piece of state
+  // derived from it. Clearing localStorage while a risk card computed from those
+  // labs is still on screen would leave the deletion looking incomplete, which
+  // for this particular control is the same as looking untrustworthy.
+  const deleteEverything = useCallback(() => {
+    clearEverything();
+    setLabs({});
+    setPreMealGlucose(null);
+    setHistory([]);
+    setResult(null);
+    setAlts(null);
+    setNarration(null);
+    setBloods(null);
+    setMeal(DEFAULT_MEAL);
+    setTab("meal");
+    setConsented(false);
   }, []);
 
   const runAssessment = useCallback(async () => {
@@ -243,6 +263,9 @@ export default function App() {
           <p>
             {meta.cohort?.citation} Nothing you enter leaves your browser except
             to be scored; no personal data is stored on the server.
+          </p>
+          <p className="foot-actions">
+            <DeleteData onDelete={deleteEverything} />
           </p>
         </footer>
       </main>

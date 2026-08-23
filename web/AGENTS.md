@@ -58,7 +58,7 @@ Six screens. `src/components/` has a stub for each with a TODO.
 | **Onboarding** | Build the form from `getFields()`. Every field is optional — order by `importance_rank` so someone filling only the first three gets most of the available accuracy. Show which fields were imputed and that filling more narrows the estimate. Gate on `meta.disclaimer` and `meta.exclusions`. |
 | **Meal input** | Macros, meal type, optional pre-meal glucose. **Validate hard** — carbohydrate in the source data runs 0–761 g, and a typo'd 660 for 66 must not sail through. Prompt for pre-meal glucose: it lifts flag AUC from 0.836 to 0.885. |
 | **Risk card** | Probability, cohort band, predicted peak, curve. Use `describeRisk()` from the client for the wording. |
-| **Alternatives** | `edits[]`, smallest effective change first, each with `delta_probability`. `from_your_history[]` is the user's own past low-response meals — empty until they log some. **Empty `edits` means the meal is already in their lower range: say that, don't invent a suggestion.** |
+| **Alternatives** | `edits[]`, each with `delta_probability`. The API returns them gentlest-ask-first; `Alternatives.tsx` re-sorts to most-effective-first, because a list reading 67%, 67%, 73% looks unsorted once the probabilities are on screen. Both orders are defensible — if you change one, change this line too. `from_your_history[]` is the user's own past low-response meals, empty until they log some. **Empty `edits` means the meal is already in their lower range: say that, don't invent a suggestion.** |
 | **History** | `src/lib/storage.ts` already handles persistence. Log the *observed* outcome the user enters later, never the prediction. Show `personalization.meals_logged` climbing. |
 | **Learning curve** | Plot `meta.performance.learning_curve`. Nine real points measured on held-out people, averaged over seven shuffles each. Cheapest thing in the app and the most convincing. The kink at 6 is real: that is where the correction gains a slope. |
 | **Would a test help?** | Value of information. **Never tell a CGM wearer to get a glucose panel** — they already have continuous glucose. Lead with the analytes a draw actually adds: HbA1c and fasting insulin. Score 0 means say so and offer nothing. |
@@ -106,8 +106,13 @@ selects one should not get a reading.
 
 **Nothing personal leaves the browser.** The backend is stateless by design —
 labs and history are sent per request and never stored server-side. Do not add a
-session, a user table, or an analytics call carrying lab values or meals. Please
-do build a "delete my data" control; `clearEverything()` is already there.
+session, a user table, or an analytics call carrying lab values or meals.
+
+`DeleteData` in the footer is the other half of that promise, and it has to keep
+working: it calls `clearEverything()` *and* resets every piece of App state
+derived from storage. Clearing localStorage while a risk card computed from those
+labs is still on screen makes the deletion look partial, which for this control
+is the same as making it look untrue.
 
 ## Conventions
 

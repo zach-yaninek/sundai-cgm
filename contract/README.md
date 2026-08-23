@@ -53,10 +53,12 @@ flag AUC from 0.841 to 0.888.
 wide.** If the UI shows 72% in the same confident type either way, the honesty in
 the API is wasted.
 
-**Alternatives** — `edits[]` smallest effective change first, each with its
-`delta_probability`. `from_your_history[]` is the user's own past low-response
-meals and is empty until they've logged some. Empty `edits` means the meal is
-already in their lower range — say that, don't invent a suggestion.
+**Alternatives** — `edits[]`, each with its `delta_probability`. The API returns
+them gentlest-ask-first (that is what `EDIT_LADDER` encodes); the shipped UI
+re-sorts to most-effective-first, on the grounds that 67%, 67%, 73% reads as
+unsorted. `from_your_history[]` is the user's own past low-response meals and is
+empty until they've logged some. Empty `edits` means the meal is already in their
+lower range — say that, don't invent a suggestion.
 
 **History** — localStorage log of meals and observed outcomes, feeding the
 `history` field. Show `personalization.meals_logged` climbing.
