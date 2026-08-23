@@ -231,5 +231,23 @@
         ]
       }
     ]
+  },
+  "study_structure": {
+    "note": "CGMacros is largely a standardized-meal study; the same dishes recur across nearly every subject.",
+    "standardized_rows": 857,
+    "total_rows": 1382,
+    "distinct_standardized_meals": 16,
+    "subjects_per_top_meal": 44,
+    "clip_cosine_within_meal": 0.714,
+    "clip_cosine_across_meals": 0.559,
+    "variance_standardized_subset": {
+      "meal_identity_pct": 20.8,
+      "subject_identity_pct": 28.6
+    },
+    "variance_full_set": {
+      "meal_identity_pct": 39.7,
+      "subject_identity_pct": 27.4
+    },
+    "per_subject_mean_iauc_spread": "13 to 112 mg/dL*h (8.7x)"
   }
 }
