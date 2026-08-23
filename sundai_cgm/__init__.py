@@ -21,4 +21,4 @@ from .voi import (
 
 __all__ = ["value_of_information", "reliability", "tier_for", "best_tier",
            "grid", "TIERS"]
-__version__ = "1.1.0"
+__version__ = "1.1.1"
