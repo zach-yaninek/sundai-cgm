@@ -249,5 +249,173 @@
       "subject_identity_pct": 27.4
     },
     "per_subject_mean_iauc_spread": "13 to 112 mg/dL*h (8.7x)"
+  },
+  "rung4": {
+    "target": "iauc",
+    "n": 857,
+    "dishes": 16,
+    "subjects": 45,
+    "headline": "cold / rung 4: meal + labs",
+    "note": "Effective n for learning the personalisation mapping is 45 subjects, not 857 rows \u2014 the lab features vary only between people.",
+    "known_regime_caveat": "Lab vectors are unique per subject (45/45 distinct), so under known folds they act as a subject ID and the model largely memorises the 720 subject-meal cells. Known-regime rung 4 numbers are NOT a personalisation result and must not be quoted as one.",
+    "gut_panel": "Helps under known folds and hurts cold-start (33.03 vs 32.56 MAE) \u2014 22 features across 45 subjects is over-parameterised, and the gain is fingerprinting rather than signal. Headline model omits it.",
+    "top_subject_predictors": {
+      "fasting_glu___pdl_lab": 0.06287390738725662,
+      "homa_ir": 0.03621305152773857,
+      "a1c_pdl_lab": 0.03143713250756264,
+      "cholesterol": 0.029315831139683723,
+      "sulfide_gas_production_pathways": 0.029023906216025352,
+      "gas_production": 0.026669736951589584,
+      "oxalate_metabolism_pathways": 0.024220988154411316,
+      "triglycerides": 0.023182494565844536,
+      "biofilm_chemotaxis_and_virulence_pathways": 0.022696005180478096,
+      "metabolic_fitness": 0.022459354251623154
+    },
+    "results": [
+      {
+        "mae": 40.195559523744905,
+        "rmse": 52.25711570448678,
+        "r2": -0.015948610143780684,
+        "n": 857,
+        "regime": "cold",
+        "name": "global mean (floor)",
+        "mae_ci": [
+          35.767252748175686,
+          45.19817644152077
+        ]
+      },
+      {
+        "mae": 35.13937157482917,
+        "rmse": 46.9918051889642,
+        "r2": 0.17846678455644016,
+        "n": 857,
+        "regime": "cold",
+        "name": "meal identity only",
+        "mae_ci": [
+          30.686762906452017,
+          40.37886258783974
+        ]
+      },
+      {
+        "mae": 32.55851041317357,
+        "rmse": 43.128281704770565,
+        "r2": 0.3080014559788157,
+        "n": 857,
+        "regime": "cold",
+        "name": "rung 4: meal + labs",
+        "mae_ci": [
+          28.48469994354026,
+          36.958074487304685
+        ]
+      },
+      {
+        "mae": 33.03460730905433,
+        "rmse": 43.690514315235696,
+        "r2": 0.2898416727416745,
+        "n": 857,
+        "regime": "cold",
+        "name": "rung 4: meal + labs + gut",
+        "mae_ci": [
+          28.74120313140876,
+          37.66662472074837
+        ]
+      },
+      {
+        "mae": 37.81690100080444,
+        "rmse": 50.45563404034551,
+        "r2": 0.05289047209684028,
+        "n": 857,
+        "regime": "cold",
+        "name": "labs only (no meal)",
+        "mae_ci": [
+          32.92832769871161,
+          42.996463823590226
+        ]
+      },
+      {
+        "mae": 39.80898256537464,
+        "rmse": 51.89449828412023,
+        "r2": -0.0018979885387024886,
+        "n": 857,
+        "regime": "known",
+        "name": "global mean (floor)",
+        "mae_ci": [
+          35.385247235033326,
+          44.748571882333536
+        ]
+      },
+      {
+        "mae": 34.18676877316885,
+        "rmse": 45.84764936147901,
+        "r2": 0.21798511848978053,
+        "n": 857,
+        "regime": "known",
+        "name": "subject mean (floor)",
+        "mae_ci": [
+          29.017922711940393,
+          39.28232387636428
+        ]
+      },
+      {
+        "mae": 35.42953951882741,
+        "rmse": 47.2026711949873,
+        "r2": 0.1710773215704604,
+        "n": 857,
+        "regime": "known",
+        "name": "meal identity only",
+        "mae_ci": [
+          30.961572589427863,
+          40.61495671227809
+        ]
+      },
+      {
+        "mae": 26.81095576343912,
+        "rmse": 37.019852001208754,
+        "r2": 0.49014084018957804,
+        "n": 857,
+        "regime": "known",
+        "name": "rung 4: meal + labs",
+        "mae_ci": [
+          22.860704698924202,
+          30.70316418151276
+        ]
+      },
+      {
+        "mae": 26.634649924809878,
+        "rmse": 36.852259008139036,
+        "r2": 0.4947467691633307,
+        "n": 857,
+        "regime": "known",
+        "name": "rung 4: meal + labs + gut",
+        "mae_ci": [
+          22.668455036971487,
+          30.593322649181413
+        ]
+      },
+      {
+        "mae": 34.202498588131725,
+        "rmse": 45.87820356726445,
+        "r2": 0.21694245629332454,
+        "n": 857,
+        "regime": "known",
+        "name": "labs only (no meal)",
+        "mae_ci": [
+          29.03546235487897,
+          39.34028130989888
+        ]
+      },
+      {
+        "mae": 29.44521157205068,
+        "rmse": 39.288370570269976,
+        "r2": 0.4257395532654471,
+        "n": 857,
+        "regime": "known",
+        "name": "oracle: meal + subject id",
+        "mae_ci": [
+          25.456571109130408,
+          33.53751241186469
+        ]
+      }
+    ]
   }
 }

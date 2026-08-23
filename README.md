@@ -1,18 +1,25 @@
 # sundai-cgm
 
-Predicting the glucose response to a meal from its photograph — built on the
-`cgm/` kit of the MIT Sundai Hack 137 data bucket.
+**Why does the same meal spike one person and not another?**
+
+Built on the `cgm/` kit of the MIT Sundai Hack 137 data bucket. The project
+started out predicting glucose response from a meal photograph, and the data
+redirected it: CGMacros turns out to be largely a **standardized-meal study**,
+so for most of it everyone ate the same food and the *person* is the variable.
 
 An **iterative model ladder**, where each rung answers one question and the
 previous rung is the number it has to beat:
 
-| Rung | Input | Question |
-|---|---|---|
-| 0 | — | Floors: the global mean, and a returning user's own average |
-| 1 | Logged macros | What is knowable from a *perfect* food log? |
-| 3 | CLIP image embedding | Does the photo carry signal the macros miss? |
-| 2 | Photo → VLM → estimated macros | What is a vision stage actually worth? |
-| 4 | + labs, gut panel | Does personalisation beat knowing the person's average? |
+| Rung | Input | Question | Cold-start R² |
+|---|---|---|---|
+| 0 | — | Floors: global mean, and a returning user's own average | — |
+| 1 | Logged macros | What is knowable from a *perfect* food log? | 0.208 |
+| 3 | CLIP image embedding | Does the photo carry signal the macros miss? | **0.026** |
+| 4 | Meal identity + fasting labs | **Can a lab panel predict a stranger's response?** | **0.308** |
+
+Rung 2 (photo → estimated macros → response) is written and runs against either
+Claude or a local VLM, but was cut once the study structure became clear — see
+*Why rung 2 was dropped*.
 
 ## Install
 
@@ -41,35 +48,109 @@ d  = targets.modelling_set()          # 1,382 rows — prints its own funnel
 c  = targets.curve(subject=1, timestamp=d.timestamp.iloc[0])
 ```
 
+Reproduce the ladder:
+
+```bash
+python rung1_macros.py      # logged macros -> response
+python embed.py             # CLIP vectors, ~18s on Apple MPS
+python rung3_clip.py        # image embedding -> response
+python rung4_subject.py     # meal + labs -> response   (the headline)
+```
+
 ## Results
 
 Target is **iAUC over 120 minutes** (mg/dL·h) — the area between the glucose
-curve and its own starting value. Cross-validation is grouped by subject.
+curve and its own starting value. Cross-validation is grouped by subject, and
+**cold-start** means the held-out person was never seen in training. That is the
+only regime in which a claim about a *new* person is honest.
+
+### Rung 4 — the headline
+
+On the 857 standardized meals (16 dishes, 45 subjects):
+
+| Model | n | MAE | 95% CI | R² |
+|---|---|---|---|---|
+| Global mean *(floor)* | 857 | 40.20 | [35.8, 45.2] | −0.016 |
+| Meal identity only | 857 | 35.14 | [30.7, 40.4] | 0.178 |
+| **Meal + fasting labs** | **857** | **32.56** | **[28.5, 37.0]** | **0.308** |
+| Meal + labs + gut panel | 857 | 33.03 | [28.7, 37.7] | 0.290 |
+| Labs only, no meal | 857 | 37.82 | [32.9, 43.0] | 0.053 |
+
+**Knowing a stranger's fasting labs improves prediction over knowing only what
+they ate** — R² 0.308 against meal identity's 0.178. The strongest single
+predictors are fasting glucose, HOMA-IR and HbA1c, which is the result a
+clinician would expect and is reassuring rather than novel.
+
+The **gut panel does not help cold-start** (0.290 vs 0.308). 22 Viome features
+across 45 subjects is over-parameterised, and what looks like a gain in-sample
+is fingerprinting. The headline model omits it.
+
+### Rungs 0–3
 
 | Model | Regime | n | MAE | 95% CI | R² |
 |---|---|---|---|---|---|
 | Global mean *(floor)* | cold | 1,382 | 36.24 | [32.5, 40.4] | −0.020 |
 | Carbs only | cold | 1,382 | 33.43 | [29.9, 37.6] | 0.112 |
-| **Rung 1 — all macros** | **cold** | **1,382** | **31.13** | **[27.9, 34.7]** | **0.208** |
-| Global mean *(floor)* | known | 1,382 | 35.91 | [32.2, 40.1] | −0.004 |
+| **Rung 1 — all macros** | cold | 1,382 | 31.13 | [27.9, 34.7] | 0.208 |
+| Rung 3 — CLIP PCA-64 | cold | 1,382 | 34.75 | [31.2, 38.7] | **0.026** |
+| Rung 3 — CLIP + macros | cold | 1,382 | 31.38 | [28.1, 34.9] | 0.214 |
 | Subject mean *(floor)* | known | 1,382 | 30.76 | [26.3, 35.2] | 0.210 |
-| Carbs only | known | 1,382 | 33.06 | [29.6, 37.1] | 0.136 |
-| **Rung 1 — all macros** | **known** | **1,382** | **29.63** | **[26.6, 32.8]** | **0.267** |
+| Rung 1 — all macros | known | 1,382 | 29.63 | [26.6, 32.8] | 0.267 |
 
-**Two regimes, and they answer different questions.** `cold` holds out whole
-subjects — a stranger uploads a photo, which is the webapp case. `known` puts
-some of that person's other meals in training. A per-subject-mean baseline only
-*exists* in `known`, because under cold folds the held-out subject has no
-training rows at all.
+Two things worth reading off this table. **A generic image embedding carries
+almost nothing** — R² 0.026 cold-start, barely distinguishable from predicting
+the mean. And **for a returning user, their own historical average (30.76) very
+nearly matches the full macro model (29.63)**, intervals overlapping: knowing
+*who* ate the meal is about as informative as knowing *what* they ate.
 
-**The most interesting number here is a floor, not a model.** For a returning
-user, predicting their own historical average gives MAE 30.76 — and the full
-macro model only reaches 29.63, with heavily overlapping intervals. Knowing
-*who* ate the meal is very nearly as informative as knowing *what* they ate.
-Carbohydrate alone (33.06) does not even match the personal average.
+### What the data turned out to be
 
-That is the bar the photo rungs have to clear, and it is a harder one than the
-usual "beat the global mean" framing would suggest.
+| | |
+|---|---|
+| Meals whose macro combination recurs 20+ times | **857 of 1,382 (62%)** |
+| Distinct standardized dishes | **16** |
+| Subjects eating each top dish | **43–44 of 45** |
+| CLIP cosine within a dish vs across | **0.714 vs 0.559** |
+| iAUC range for one identical meal (66 g carb, 712 kcal) | **6 to 253** |
+| Per-subject mean iAUC | **13 to 112 (8.7×)** |
+
+Variance in glucose response, on the standardized subset:
+
+| Explained by | |
+|---|---|
+| **Subject identity** | **28.6%** |
+| Meal identity | 20.8% |
+
+### Two caveats that limit these numbers
+
+**The `known` regime inflates rung 4 and must not be quoted.** Every subject has
+a unique lab vector — BMI alone separates all 45 — so when the same person
+appears in training the lab panel acts as a subject ID. With 45 subjects × 16
+dishes = 720 cells and 857 rows, the model can nearly memorise each person-meal
+pair, which is why it appears to beat the subject-identity oracle there. The
+cold-start rows are the claim.
+
+**The effective n is 45, not 857.** Lab features vary only between people, so
+the personalisation mapping is learned from 45 subjects however many meals they
+each ate. The confidence intervals are bootstrapped over subjects for that
+reason. This is enough to demonstrate; it is not enough to claim.
+
+## Why rung 2 was dropped
+
+`annotate.py` is complete and runs against Claude (Batches API) or a local VLM
+(Ollama), writing an identical `vision_macros.parquet` either way. It was cut on
+evidence, not for time:
+
+- With **16 dishes covering 62% of the data**, estimating macros from a photo is
+  a lookup problem, not an estimation problem — and the macros barely vary.
+- A local `qwen2.5vl:7b` ran **12.1 s/image** and, on a 12-photo probe, its carb
+  estimates ranked *inversely* to the logged values (Spearman −0.706, median
+  ratio 0.49). It systematically under-read portions.
+- Rung 3 had already shown the image contributes R² 0.026 cold-start.
+
+The code is kept because the finding is worth reproducing, and because the
+provider contract is the part that would matter if this ran on a dataset where
+the meals actually differed.
 
 ## What the loader repairs
 
