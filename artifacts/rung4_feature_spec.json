@@ -1,4 +1,38 @@
 {
+  "model": "rung4_subject.json",
+  "columns": [
+    "meal_0.0/0.0",
+    "meal_16.0/435.0",
+    "meal_19.0/355.0",
+    "meal_24.0/268.0",
+    "meal_40.0/585.0",
+    "meal_43.0/445.0",
+    "meal_66.0/448.0",
+    "meal_66.0/608.0",
+    "meal_66.0/712.0",
+    "meal_73.0/902.0",
+    "meal_76.0/575.0",
+    "meal_81.0/1180.0",
+    "meal_92.0/830.0",
+    "meal_93.0/1110.0",
+    "meal_94.0/555.0",
+    "meal_94.0/725.0",
+    "age",
+    "bmi",
+    "body_weight",
+    "height",
+    "a1c_pdl_lab",
+    "fasting_glu___pdl_lab",
+    "insulin",
+    "triglycerides",
+    "cholesterol",
+    "hdl",
+    "non_hdl",
+    "ldl_cal",
+    "vldl_cal",
+    "cho_hdl_ratio",
+    "homa_ir"
+  ],
   "meal_columns": [
     "meal_0.0/0.0",
     "meal_16.0/435.0",
@@ -34,7 +68,7 @@
     "cho_hdl_ratio",
     "homa_ir"
   ],
-  "gut_columns": [
+  "gut_columns_not_served": [
     "gut_lining_health",
     "lps_biosynthesis_pathways",
     "biofilm_chemotaxis_and_virulence_pathways",
@@ -58,11 +92,32 @@
     "salt_stress_pathways",
     "microbiome_induced_stress"
   ],
+  "impute_medians": {
+    "age": 51.0,
+    "bmi": 30.03834865,
+    "body_weight": 179.8,
+    "height": 64.0,
+    "a1c_pdl_lab": 6.0,
+    "fasting_glu___pdl_lab": 112.0,
+    "insulin": 13.5,
+    "triglycerides": 124.0,
+    "cholesterol": 187.0,
+    "hdl": 51.0,
+    "non_hdl": 137.0,
+    "ldl_cal": 115.0,
+    "vldl_cal": 25.0,
+    "cho_hdl_ratio": 3.8,
+    "homa_ir": 4.4251851851851844
+  },
+  "derived": {
+    "homa_ir": "fasting_glu___pdl_lab * insulin / 405"
+  },
   "excluded_features": [
     "self_identify",
     "gender"
   ],
   "excluded_reason": "self-reported race/ethnicity is a social category, not a physiological mechanism; the lab panel carries the physiology",
   "min_repeats": 20,
-  "target": "iauc"
+  "target": "iauc",
+  "target_units": "mg/dL*h (incremental AUC over 120 min)"
 }

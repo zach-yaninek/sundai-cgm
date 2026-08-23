@@ -135,6 +135,50 @@ the personalisation mapping is learned from 45 subjects however many meals they
 each ate. The confidence intervals are bootstrapped over subjects for that
 reason. This is enough to demonstrate; it is not enough to claim.
 
+## Serving
+
+`predict.py` is the whole serving surface. It reads **only** from `artifacts/` —
+no training code path, no network, no source data — so a deployment is a small
+container reading a 30 KB booster.
+
+```python
+import predict
+
+predict.rank_meals(labs)                       # every dish, best-tolerated first
+predict.predict_response(labs, "66.0/712.0")   # one dish, with a curve to plot
+predict.dish_catalog()                         # the 16 dishes and their spread
+predict.required_labs()                        # which fields the model uses
+```
+
+The product question it answers: **given this person's bloodwork, which of these
+meals is gentlest for them?** Two illustrative panels across the same 16 dishes:
+
+| Panel | HOMA-IR | Predicted iAUC range |
+|---|---|---|
+| Metabolically healthy | 0.9 | **0 – 64** |
+| Insulin resistant | 5.1 | **24 – 133** |
+
+Design decisions worth knowing:
+
+- **Column order is pinned in `feature_spec.json`, not in convention.** The
+  serving vector is rebuilt from the recorded order, because training/serving
+  skew is invisible when it happens — the model still returns a confident number.
+- **A partial panel degrades rather than errors.** Missing labs fall back to
+  training medians, and `imputed_fields` reports which, so a prediction resting
+  on six guesses is visibly weaker than one that isn't.
+- **`homa_ir` is derived** from glucose × insulin / 405 when both are present,
+  so callers don't need the formula.
+- **Predictions clip at zero.** iAUC is the area *above* baseline and cannot be
+  negative. The reported evaluation metrics do *not* include this clip, so they
+  are marginally conservative rather than flattered by it.
+- **Unknown dishes and unknown lab fields raise.** A silently ignored typo in a
+  field name is a wrong prediction, not a missing one.
+
+`test_predict.py` reloads the booster through the public API and checks it
+reproduces training-time predictions row for row — currently exact, max
+difference 0.00e+00. That test is what stands between this and a demo that
+looks fine and is wrong.
+
 ## Why rung 2 was dropped
 
 `annotate.py` is complete and runs against Claude (Batches API) or a local VLM

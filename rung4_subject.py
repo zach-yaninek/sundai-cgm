@@ -157,29 +157,95 @@ def main() -> None:
         "  stranger and only their labs are available."
     )
 
-    # Which markers actually carry the personal signal?
+    # The SERVING model is the headline one: meal + labs, no gut panel. Saving
+    # the meal+labs+gut variant instead would ship a model the results table
+    # does not recommend, and predict.py would then need the gut columns that a
+    # new user will not have.
+    serving_cols = meal + labs
     final = xgb.XGBRegressor(**PARAMS)
-    final.fit(X[meal + labs + gut], y, verbose=False)
-    imp = (pd.Series(final.feature_importances_, index=meal + labs + gut)
+    final.fit(X[serving_cols], y, verbose=False)
+
+    imp = (pd.Series(final.feature_importances_, index=serving_cols)
            .sort_values(ascending=False))
     non_meal = imp[~imp.index.str.startswith("meal_")]
-    print("\ntop subject-level predictors (gain-weighted):")
+    print("\ntop subject-level predictors, headline model (gain-weighted):")
     for name, val in non_meal.head(10).items():
         print(f"  {name:<42} {val:.4f}")
+
+    # Importances from the full variant, for the record only -- this model is
+    # not served, because the gut panel does not survive cold-start.
+    full = xgb.XGBRegressor(**PARAMS)
+    full.fit(X[meal + labs + gut], y, verbose=False)
+    full_imp = (pd.Series(full.feature_importances_, index=meal + labs + gut)
+                .sort_values(ascending=False))
+    full_non_meal = full_imp[~full_imp.index.str.startswith("meal_")]
 
     ARTIFACTS.mkdir(exist_ok=True)
     (ARTIFACTS / "models").mkdir(exist_ok=True)
     final.get_booster().save_model(str(ARTIFACTS / "models" / "rung4_subject.json"))
 
+    lab_medians = X[labs].median().to_dict()
     spec = {
-        "meal_columns": meal, "lab_columns": labs, "gut_columns": gut,
+        "model": "rung4_subject.json",
+        "columns": serving_cols,          # exact order the booster expects
+        "meal_columns": meal,
+        "lab_columns": labs,
+        "gut_columns_not_served": gut,
+        "impute_medians": {k: float(v) for k, v in lab_medians.items()},
+        "derived": {"homa_ir": "fasting_glu___pdl_lab * insulin / 405"},
         "excluded_features": EXCLUDED_FEATURES,
         "excluded_reason": "self-reported race/ethnicity is a social category, not a "
                            "physiological mechanism; the lab panel carries the physiology",
         "min_repeats": MIN_REPEATS,
         "target": TARGET,
+        "target_units": "mg/dL*h (incremental AUC over 120 min)",
     }
     (ARTIFACTS / "rung4_feature_spec.json").write_text(json.dumps(spec, indent=2))
+
+    # Dish catalog: what a user actually chooses between at serving time.
+    cat = (df.groupby("meal_id")
+             .agg(carbs=("carbs", "first"), calories=("calories", "first"),
+                  protein=("protein", "first"), fat=("fat", "first"),
+                  fiber=("fiber", "first"), meal_type=("meal_type", "first"),
+                  n_meals=("iauc", "size"), n_subjects=("subject", "nunique"),
+                  observed_median_iauc=("iauc", "median"),
+                  observed_p25=("iauc", lambda v: v.quantile(0.25)),
+                  observed_p75=("iauc", lambda v: v.quantile(0.75)))
+             .reset_index()
+             .sort_values("observed_median_iauc", ascending=False))
+    cat["column"] = "meal_" + cat["meal_id"]
+    cat.to_parquet(ARTIFACTS / "dish_catalog.parquet", index=False)
+
+    # Median observed response curve per dish, on a common minute grid. The
+    # served model predicts a scalar (iAUC); these give the webapp a real shape
+    # to draw under it. It is an observed average, not a prediction.
+    grid = np.arange(0, 121, 5)
+    ts = cgm.timeseries(sensor=cgm.DEFAULT_SENSOR)
+    by_subject = {sid: g.set_index("timestamp")["glucose"].sort_index()
+                  for sid, g in ts.groupby("subject", sort=False)}
+    curve_rows = []
+    for meal_id, block in df.groupby("meal_id"):
+        stacked = []
+        for row in block.itertuples():
+            series = by_subject.get(row.subject)
+            if series is None:
+                continue
+            window = series.loc[row.timestamp : row.timestamp + pd.Timedelta(minutes=120)].dropna()
+            if len(window) < 60:
+                continue
+            minutes = (window.index - window.index[0]).total_seconds() / 60
+            stacked.append(np.interp(grid, minutes, window.to_numpy() - float(window.iloc[0])))
+        if stacked:
+            median = np.median(np.vstack(stacked), axis=0)
+            curve_rows += [{"meal_id": meal_id, "minute": int(m), "delta": float(d),
+                            "n_curves": len(stacked)} for m, d in zip(grid, median)]
+    pd.DataFrame(curve_rows).to_parquet(ARTIFACTS / "dish_curves.parquet", index=False)
+
+    # In-sample predictions from the served model, so a round-trip test can
+    # prove predict.py rebuilds the feature vector identically.
+    df_out = df[["subject", "timestamp", "meal_id", TARGET]].copy()
+    df_out["pred_rung4_insample"] = final.predict(X[serving_cols])
+    df_out.to_parquet(ARTIFACTS / "rung4_insample.parquet", index=False)
 
     results_path = ARTIFACTS / "results.json"
     existing = json.loads(results_path.read_text()) if results_path.exists() else {}
@@ -200,6 +266,8 @@ def main() -> None:
                      "22 features across 45 subjects is over-parameterised, and the gain "
                      "is fingerprinting rather than signal. Headline model omits it.",
         "top_subject_predictors": {k: float(v) for k, v in non_meal.head(10).items()},
+        "top_predictors_full_variant_not_served":
+            {k: float(v) for k, v in full_non_meal.head(10).items()},
         "results": [
             {k: v for k, v in r.items() if k != "mae_ci"} | {"mae_ci": list(r["mae_ci"])}
             for r in results
@@ -207,16 +275,17 @@ def main() -> None:
     }
     results_path.write_text(json.dumps(existing, indent=2))
 
-    preds_path = ARTIFACTS / "predictions.parquet"
-    if preds_path.exists():
-        preds = pd.read_parquet(preds_path)
-        add = df[["subject", "timestamp"]].copy()
-        add["pred_rung4_cold"] = oof_store[("cold", "rung 4: meal + labs + gut")]
-        preds = preds.merge(add, on=["subject", "timestamp"], how="left")
-        preds.to_parquet(preds_path, index=False)
+    add = df[["subject", "timestamp"]].copy()
+    add["pred_rung4_cold"] = oof_store[("cold", "rung 4: meal + labs")]
+    evaluate.upsert_predictions(ARTIFACTS / "predictions.parquet", add)
 
-    print(f"\nwrote {ARTIFACTS / 'models' / 'rung4_subject.json'}")
+    print(f"\nwrote {ARTIFACTS / 'models' / 'rung4_subject.json'} "
+          f"({len(serving_cols)} features: {len(meal)} meal + {len(labs)} lab)")
     print(f"wrote {ARTIFACTS / 'rung4_feature_spec.json'}")
+    print(f"wrote {ARTIFACTS / 'dish_catalog.parquet'} ({len(cat)} dishes)")
+    print(f"wrote {ARTIFACTS / 'dish_curves.parquet'} "
+          f"({len(curve_rows)} points on a {len(grid)}-minute grid)")
+    print(f"wrote {ARTIFACTS / 'rung4_insample.parquet'}")
     print(f"updated {results_path}")
 
 

@@ -122,6 +122,32 @@ def subject_mean_factory(groups):
     return fit_predict
 
 
+def upsert_predictions(path, new: pd.DataFrame, keys=("subject", "timestamp")):
+    """Merge prediction columns into the shared predictions file, idempotently.
+
+    Re-running a rung must overwrite its own columns rather than colliding with
+    the copies it wrote last time — a plain merge raises on the second run.
+    """
+    from pathlib import Path
+
+    path = Path(path)
+    keys = list(keys)
+    if not path.exists():
+        new.to_parquet(path, index=False)
+        return new
+    prior = pd.read_parquet(path)
+    incoming = [c for c in new.columns if c not in keys]
+    # Drop the columns being replaced, and any _x/_y twins a previously failed
+    # merge may have left behind — those do not match by name and would
+    # otherwise survive forever.
+    stale = [c for c in prior.columns
+             if c in incoming or any(c == f"{i}_x" or c == f"{i}_y" for i in incoming)]
+    prior = prior.drop(columns=stale)
+    merged = prior.merge(new, on=keys, how="left")
+    merged.to_parquet(path, index=False)
+    return merged
+
+
 def report(results: list[dict], *, target="iauc") -> pd.DataFrame:
     """Format a list of metric dicts as the results table."""
     rows = []

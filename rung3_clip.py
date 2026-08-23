@@ -131,12 +131,10 @@ def main() -> None:
     )
 
     preds_path = ARTIFACTS / "predictions.parquet"
-    preds = pd.read_parquet(preds_path) if preds_path.exists() else df[["subject", "timestamp"]]
     add = df[["subject", "timestamp"]].copy()
     for regime in ("cold", "known"):
         add[f"pred_rung3_{regime}"] = oof_store[(regime, f"rung 3: CLIP PCA-{N_COMPONENTS}")]
-    preds = preds.merge(add, on=["subject", "timestamp"], how="left")
-    preds.to_parquet(preds_path, index=False)
+    evaluate.upsert_predictions(preds_path, add)
 
     results_path = ARTIFACTS / "results.json"
     existing = json.loads(results_path.read_text()) if results_path.exists() else {}

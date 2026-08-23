@@ -260,6 +260,18 @@
     "known_regime_caveat": "Lab vectors are unique per subject (45/45 distinct), so under known folds they act as a subject ID and the model largely memorises the 720 subject-meal cells. Known-regime rung 4 numbers are NOT a personalisation result and must not be quoted as one.",
     "gut_panel": "Helps under known folds and hurts cold-start (33.03 vs 32.56 MAE) \u2014 22 features across 45 subjects is over-parameterised, and the gain is fingerprinting rather than signal. Headline model omits it.",
     "top_subject_predictors": {
+      "fasting_glu___pdl_lab": 0.07941906154155731,
+      "homa_ir": 0.048665642738342285,
+      "a1c_pdl_lab": 0.04424117133021355,
+      "vldl_cal": 0.03473464027047157,
+      "triglycerides": 0.029740924015641212,
+      "cholesterol": 0.029549825936555862,
+      "insulin": 0.027736244723200798,
+      "bmi": 0.0254049114882946,
+      "hdl": 0.025036580860614777,
+      "ldl_cal": 0.022903980687260628
+    },
+    "top_predictors_full_variant_not_served": {
       "fasting_glu___pdl_lab": 0.06287390738725662,
       "homa_ir": 0.03621305152773857,
       "a1c_pdl_lab": 0.03143713250756264,
