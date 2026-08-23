@@ -1,0 +1,11 @@
+LICENSE
+README.md
+pyproject.toml
+sundai_cgm/__init__.py
+sundai_cgm/voi.py
+sundai_cgm.egg-info/PKG-INFO
+sundai_cgm.egg-info/SOURCES.txt
+sundai_cgm.egg-info/dependency_links.txt
+sundai_cgm.egg-info/requires.txt
+sundai_cgm.egg-info/top_level.txt
+sundai_cgm/_data/information_value.json

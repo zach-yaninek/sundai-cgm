@@ -1,0 +1,77 @@
+{
+  "recommended_tier": {
+    "with_glucose": "core",
+    "no_glucose": "core"
+  },
+  "note": "Cold-start, subject-grouped CV. 'none' means the model has only macros, demographics and (optionally) a CGM reading. A CGM cannot measure HbA1c, insulin or lipids, which is why a draw still adds information to someone already wearing one.",
+  "free_fields": [
+    "age",
+    "bmi",
+    "body_weight",
+    "height"
+  ],
+  "tiers": {
+    "none": [],
+    "core": [
+      "a1c_pdl_lab",
+      "insulin",
+      "fasting_glu___pdl_lab",
+      "homa_ir"
+    ],
+    "full": [
+      "a1c_pdl_lab",
+      "insulin",
+      "fasting_glu___pdl_lab",
+      "homa_ir",
+      "triglycerides",
+      "cholesterol",
+      "hdl",
+      "non_hdl",
+      "ldl_cal",
+      "vldl_cal",
+      "cho_hdl_ratio"
+    ]
+  },
+  "grid": {
+    "with_glucose": {
+      "none": {
+        "auc": 0.8463,
+        "mae_iauc": 33.524,
+        "r2_iauc": 0.103,
+        "n_lab_fields": 0
+      },
+      "core": {
+        "auc": 0.8868,
+        "mae_iauc": 29.176,
+        "r2_iauc": 0.2581,
+        "n_lab_fields": 4
+      },
+      "full": {
+        "auc": 0.889,
+        "mae_iauc": 28.25,
+        "r2_iauc": 0.2905,
+        "n_lab_fields": 11
+      }
+    },
+    "no_glucose": {
+      "none": {
+        "auc": 0.6799,
+        "mae_iauc": 35.936,
+        "r2_iauc": -0.0031,
+        "n_lab_fields": 0
+      },
+      "core": {
+        "auc": 0.8422,
+        "mae_iauc": 29.61,
+        "r2_iauc": 0.2532,
+        "n_lab_fields": 4
+      },
+      "full": {
+        "auc": 0.8353,
+        "mae_iauc": 29.22,
+        "r2_iauc": 0.2621,
+        "n_lab_fields": 11
+      }
+    }
+  }
+}

@@ -1,0 +1,4 @@
+
+[scoring]
+numpy>=1.24
+xgboost>=3.1

@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sundai-cgm"
+version = "1.1.0"
+description = "Glucose-response modelling on CGMacros, and the value of drawing labs"
+requires-python = ">=3.10"
+# Deliberately light. The value-of-information layer is a lookup over a measured
+# grid, so it needs no model weights and no xgboost. Install the [scoring] extra
+# only if you want to score individual meals.
+dependencies = []
+
+[project.optional-dependencies]
+scoring = ["numpy>=1.24", "xgboost>=3.1"]
+
+[project.urls]
+Homepage = "https://github.com/zach-yaninek/sundai-cgm"
+
+[tool.setuptools]
+packages = ["sundai_cgm"]
+
+[tool.setuptools.package-data]
+sundai_cgm = ["_data/*.json"]

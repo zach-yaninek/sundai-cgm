@@ -61,6 +61,10 @@ jobs:
         run: python test_predict.py
       - name: Run the rung-5 / recommender / personalisation tests
         run: python test_rung5.py
+      - name: Check the installable package works with no heavy deps
+        run: |
+          python -m pip install --quiet .
+          cd /tmp && python -c "from sundai_cgm import value_of_information as v; r=v({}, 104); assert r['score']==1.0, r; assert r['recommended_tier']=='core', r; print('package OK:', r['recommended_panel'])"
       - name: Validate the API contract, stub and real backend
         run: |
           python -m pip install --quiet fastapi httpx jsonschema

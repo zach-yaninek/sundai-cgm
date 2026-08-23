@@ -148,6 +148,41 @@ past = recommend.from_history(
 ok(len(past) == 1 and past[0]["observed_peak"] == 120,
    "history surfaces only same-type meals with an observed outcome below threshold")
 
+# --------------------------------------------------- value of information
+print("\n-- value of information")
+import json as _json
+from pathlib import Path as _Path
+
+import sundai_cgm
+
+_repo = _json.loads((_Path("artifacts") / "information_value.json").read_text())
+_pkg = _json.loads((_Path("sundai_cgm") / "_data" / "information_value.json").read_text())
+ok(_repo == _pkg, "the shipped grid is identical to the generated one (no drift)")
+
+blind = sundai_cgm.value_of_information({}, 104)
+covered = sundai_cgm.value_of_information(
+    {"a1c_pdl_lab": 6.2, "insulin": 18.0, "fasting_glu___pdl_lab": 115}, 104)
+ok(blind["score"] == 1.0, "no labs at all scores 1.0 — a draw recovers the whole gap")
+ok(covered["score"] == 0.0,
+   "a recent core panel scores 0.0 — a redraw would add nothing this model can use")
+ok(covered["recommended_panel"] is None,
+   "and no panel is recommended, rather than inventing one")
+ok(blind["auc_after_draw"] > blind["auc_now"], "the quoted gain is a real AUC gap")
+
+ok(sundai_cgm.best_tier(_repo["grid"]["with_glucose"]) == "core",
+   "core is preferred over full — the lipid panel adds ~0.002 AUC")
+ok(sundai_cgm.best_tier(_repo["grid"]["no_glucose"]) == "core",
+   "and without a CGM the full panel is actually worse than core")
+ok(sundai_cgm.tier_for({"hdl": 55}) == "none",
+   "a lone lipid value is not a metabolic panel")
+ok(0.8 < sundai_cgm.reliability() <= 1.0,
+   f"reliability weight is the measured best AUC ({sundai_cgm.reliability():.3f})")
+
+# The score must fall as more is known — a monotonicity the fusion layer relies on.
+_partial = sundai_cgm.value_of_information({"a1c_pdl_lab": 6.2}, 104)
+ok(blind["score"] >= _partial["score"] >= covered["score"],
+   "score falls monotonically as more analytes become known")
+
 print("\n" + "=" * 60)
 if FAILURES:
     print(f"{len(FAILURES)} FAILED:")
