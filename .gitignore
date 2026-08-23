@@ -17,3 +17,7 @@ __pycache__/
 venv/
 .ipynb_checkpoints/
 .DS_Store
+
+# frontend build output and deps (web/ has its own .gitignore too)
+web/node_modules/
+web/dist/

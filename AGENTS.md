@@ -73,6 +73,19 @@ The server is stateless by design: the lab panel and meal history live in browse
 localStorage and are sent per request. Do not add server-side storage of personal
 health data.
 
+## The frontend
+
+`web/` is a React + Vite app owned by a separate collaborator. **Do not edit it**
+unless asked — it has its own `web/AGENTS.md` with rules specific to that side.
+
+The two halves stay in sync through one mechanism: `web/src/api/schema.d.ts` is
+generated from `contract/openapi.json` by `npm run gen:api`. If you change a
+response shape, change the contract file first and tell them to regenerate;
+TypeScript then points at every call site that needs updating.
+
+`test_contract.py` validates the stub and the real backend against that same
+file. Keep it passing — it is what makes the sync promise good.
+
 ## Licences
 
 Code is MIT. **CGMacros is CC BY-NC-SA 4.0** — non-commercial, share-alike;
