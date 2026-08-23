@@ -1,0 +1,73 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CGM_CACHE: ${{ github.workspace }}/.cgm_cache
+
+jobs:
+  # Warm the data cache once, so the matrix does not pull the parquet files
+  # from the organizers' bucket five times over.
+  data:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/cache@v4
+        id: cache
+        with:
+          path: ${{ env.CGM_CACHE }}
+          key: cgm-data-v1
+      - name: Fetch the nine parquet tables
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          python -m pip install --quiet -r requirements.txt
+          python -c "import cgm; [cgm._fetch(f'{t}.parquet') for t in cgm.TABLES]"
+          du -sh "$CGM_CACHE"
+
+  test:
+    needs: data
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.CGM_CACHE }}
+          key: cgm-data-v1
+      - run: python -m pip install --quiet -r requirements.txt
+      - name: Run the repair tests
+        run: python test_cgm.py
+
+  # The floor in requirements.txt is a claim; this checks it is true.
+  oldest-deps:
+    needs: data
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - uses: actions/cache@v4
+        with:
+          path: ${{ env.CGM_CACHE }}
+          key: cgm-data-v1
+      - run: python -m pip install --quiet "pandas==2.2.*" "pyarrow==14.*" "numpy==1.26.*" "scikit-learn==1.3.*" "xgboost==2.0.*"
+      - run: python test_cgm.py

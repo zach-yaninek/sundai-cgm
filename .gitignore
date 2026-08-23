@@ -1,0 +1,19 @@
+# Data cache. The loaders fetch into ~/.cgm_cache by default, but $CGM_CACHE
+# may point inside the repo — never commit the source data or the photos.
+.cgm_cache/
+photos/
+*.zip
+*.jpg
+
+# artifacts/ IS committed: it is what the webapp reads. Ignore stray parquet
+# elsewhere, then explicitly re-include the artifact files.
+*.parquet
+!artifacts/*.parquet
+!artifacts/**/*.parquet
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+.DS_Store
