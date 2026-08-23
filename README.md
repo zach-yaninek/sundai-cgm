@@ -154,9 +154,12 @@ Three tabs, one per pillar:
 
 Under the numbers on the first tab, an **explanation** narrates what drove the
 estimate, built from the model's own SHAP attributions. It labels itself
-`written by Claude` or `generated locally` — the local template is the default
-path when no `ANTHROPIC_API_KEY` is set, and it is a supported path rather than a
-degraded one.
+`written by Claude` or `standard wording` — the second is a deterministic
+template, fixed text filled in with the model's own attribution figures. It is
+the default path when no `ANTHROPIC_API_KEY` is set, and it is a supported path
+rather than a degraded one. **Nothing needs to be installed for it**: no local
+model, no API key, no network. The label deliberately does not say "generated
+locally", which reads as though a model ran on the machine.
 
 ## Deploying it
 
@@ -180,9 +183,9 @@ Two things about the deployed instance that are not bugs:
 
 - **The explanation panel narrates locally.** `anthropic` is not in
   `requirements.txt`, so the SDK is not in the image and `explain.available()`
-  is `False`. The panel labels itself `generated locally` and that is the
-  intended production path. Add the dependency and set `ANTHROPIC_API_KEY` if
-  you want the live one.
+  is `False`. The panel labels itself `standard wording` and that is the
+  intended production path — it needs no model, local or remote. Add the
+  dependency and set `ANTHROPIC_API_KEY` if you want the live one.
 - **Render's free plan sleeps after ~15 minutes idle.** The first request after
   a quiet period waits 30–60s for a cold start and looks like a hang. Load the
   API URL yourself a minute before demoing it.

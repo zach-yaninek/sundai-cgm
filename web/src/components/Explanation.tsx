@@ -7,6 +7,13 @@
  * `source` is shown, not hidden. "template" means the deterministic fallback ran
  * — no API key, an upstream failure, or a response that failed validation — and
  * a reader deserves to know which produced the words they are reading.
+ *
+ * That fallback is labelled "standard wording", not "generated locally", which
+ * is what it used to say. "Locally" reads as *a local model wrote this* when it
+ * means *no model wrote this*: the sentence is fixed text filled in with this
+ * model's own attributions, and nothing has to be installed for it to work.
+ * A label that makes a reader wonder what they are missing is doing the
+ * opposite of disclosure.
  */
 import type { ExplainResponse } from "../api/client";
 
@@ -34,7 +41,7 @@ export default function Explanation({
       <div className="card-head">
         <h3>Why</h3>
         <span className={`source source-${data.source}`}>
-          {data.source === "claude" ? "written by Claude" : "generated locally"}
+          {data.source === "claude" ? "written by Claude" : "standard wording"}
         </span>
       </div>
 
@@ -58,8 +65,8 @@ export default function Explanation({
 
       {data.rejected_reason && (
         <p className="hint">
-          A generated explanation was discarded ({data.rejected_reason}) and this
-          was produced locally instead.
+          A written explanation was discarded ({data.rejected_reason}) and the
+          standard wording was used instead.
         </p>
       )}
     </section>
