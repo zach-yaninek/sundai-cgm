@@ -232,6 +232,19 @@ subjects                                   45
 `peak_delta` and `iauc` correlate 0.953, so they are near interchangeable;
 `iauc` is primary because it is less sensitive to one noisy reading.
 
+## Version pin you cannot ignore
+
+**`xgboost>=3.1` is a hard floor, and it forces Python >= 3.10.**
+
+xgboost 3.1+ serialises the learned `base_score` as an array. Older versions
+cannot parse that, fall back to the default 0.5, and return predictions roughly
+**53 mg/dL·h too low — with no error raised**. CI caught this on the Python 3.9
+job, where pip resolves xgboost to 2.1.4.
+
+`predict.py` now reads `base_score` back from the loaded booster and compares it
+against the value recorded in `rung4_feature_spec.json`, so a version that would
+mis-read the model raises `ArtifactError` instead of serving confident nonsense.
+
 ## Data licences
 
 **This repository does not redistribute the data or the photographs.**

@@ -1,5 +1,7 @@
 {
   "model": "rung4_subject.json",
+  "base_score": "[5.3230675E1]",
+  "xgboost_version": "3.4.1",
   "columns": [
     "meal_0.0/0.0",
     "meal_16.0/435.0",

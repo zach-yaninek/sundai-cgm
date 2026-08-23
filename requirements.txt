@@ -4,7 +4,11 @@ pandas>=2.2
 pyarrow>=14.0
 numpy>=1.24
 scikit-learn>=1.3
-xgboost>=2.0
+# xgboost 3.1 is a HARD floor, and it forces Python>=3.10. Older xgboost cannot
+# parse the array-valued base_score that 3.1+ writes: it silently defaults to
+# 0.5 and every prediction lands ~53 mg/dL*h low with no error. predict.py
+# refuses to load under a version that would do that.
+xgboost>=3.1
 
 # rung 3 only (CLIP embeddings). Not needed for the loader, targets or rung 1.
 # open_clip_torch>=2.24

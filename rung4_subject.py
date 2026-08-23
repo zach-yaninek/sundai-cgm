@@ -185,8 +185,18 @@ def main() -> None:
     final.get_booster().save_model(str(ARTIFACTS / "models" / "rung4_subject.json"))
 
     lab_medians = X[labs].median().to_dict()
+    # Record base_score so predict.py can prove the booster deserialised the way
+    # it was written. xgboost >= 3.1 stores the learned intercept as an array;
+    # older versions cannot parse that and silently fall back to 0.5, producing
+    # predictions ~53 mg/dL*h too low with no error at all. predict.py
+    # refuses to load under such a version; see requirements.txt for the pin.
+    booster_config = json.loads(final.get_booster().save_config())
+    base_score = booster_config["learner"]["learner_model_param"]["base_score"]
+
     spec = {
         "model": "rung4_subject.json",
+        "base_score": base_score,
+        "xgboost_version": xgb.__version__,
         "columns": serving_cols,          # exact order the booster expects
         "meal_columns": meal,
         "lab_columns": labs,
@@ -281,7 +291,8 @@ def main() -> None:
 
     print(f"\nwrote {ARTIFACTS / 'models' / 'rung4_subject.json'} "
           f"({len(serving_cols)} features: {len(meal)} meal + {len(labs)} lab)")
-    print(f"wrote {ARTIFACTS / 'rung4_feature_spec.json'}")
+    print(f"wrote {ARTIFACTS / 'rung4_feature_spec.json'} "
+          f"(base_score {base_score}, xgboost {xgb.__version__})")
     print(f"wrote {ARTIFACTS / 'dish_catalog.parquet'} ({len(cat)} dishes)")
     print(f"wrote {ARTIFACTS / 'dish_curves.parquet'} "
           f"({len(curve_rows)} points on a {len(grid)}-minute grid)")

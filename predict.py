@@ -66,6 +66,21 @@ def model():
                 f"model expects {n_model} features but the spec lists {n_spec}. "
                 "The artifacts are from different runs — re-run rung4_subject.py."
             )
+
+        # Prove the intercept survived deserialisation. xgboost >= 3.1 writes the
+        # learned base_score as an array; xgboost <= 3.0 cannot parse that, falls
+        # back to 0.5, and every prediction comes out ~53 mg/dL*h low — with no
+        # exception raised. Without this check that failure is completely silent.
+        expected = spec().get("base_score")
+        if expected is not None:
+            actual = json.loads(booster.save_config())["learner"]["learner_model_param"]["base_score"]
+            if str(actual) != str(expected):
+                raise ArtifactError(
+                    f"booster base_score is {actual!r} but the model was saved with "
+                    f"{expected!r}. Your xgboost ({xgb.__version__}) cannot read this "
+                    "model correctly — every prediction would be silently wrong. "
+                    "Install xgboost>=3.1 (needs Python>=3.10)."
+                )
         _MODEL = booster
     return _MODEL
 
