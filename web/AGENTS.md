@@ -10,8 +10,10 @@ the first tab.
 ## Run it
 
 ```bash
-# terminal 1 — the backend (fixtures today, the real model later)
-uv run --with fastapi --with uvicorn python contract/stub_server.py
+# terminal 1 — the real backend
+uvicorn serve:app
+# ...or the fixture server, if you only want to touch UI:
+# uv run --with fastapi --with uvicorn python contract/stub_server.py
 
 # terminal 2 — this app
 cd web && npm install && npm run dev     # http://localhost:5173
@@ -21,9 +23,8 @@ Vite proxies `/api` to `127.0.0.1:8000`, so the browser sees one origin and CORS
 never comes up. `npm run dev` against a dead backend shows a clear message
 telling you to start it — that is intentional, not a bug.
 
-The app currently renders a **vertical slice**: it fetches `/api/meta`, runs one
-real assessment and displays it. That exists to prove the contract end to end.
-Replace it with the real screens; keep the meta fetch and the consent gate.
+In a deployed build there is no proxy, so `VITE_API_BASE` supplies the API's
+absolute origin instead. See `web/.env.example`.
 
 ## The rule that matters most
 
@@ -44,9 +45,9 @@ the demo.
 
 `npm run build` regenerates before compiling, so a stale schema cannot ship.
 
-**If you need a field the API doesn't return, do not invent it client-side.** Ask
-for it to be added to the contract. A number computed in the frontend that looks
-like a model output is the worst failure mode this project has.
+**If you need a field the API doesn't return, do not invent it client-side.** Add
+it to the contract instead. A number computed in the frontend that looks like a
+model output is the worst failure mode this project has.
 
 ## What to build
 
@@ -55,11 +56,13 @@ Six screens. `src/components/` has a stub for each with a TODO.
 | Screen | Notes |
 |---|---|
 | **Onboarding** | Build the form from `getFields()`. Every field is optional — order by `importance_rank` so someone filling only the first three gets most of the available accuracy. Show which fields were imputed and that filling more narrows the estimate. Gate on `meta.disclaimer` and `meta.exclusions`. |
-| **Meal input** | Macros, meal type, optional pre-meal glucose. **Validate hard** — carbohydrate in the source data runs 0–761 g, and a typo'd 660 for 66 must not sail through. Prompt for pre-meal glucose: it lifts flag AUC from 0.841 to 0.888. |
+| **Meal input** | Macros, meal type, optional pre-meal glucose. **Validate hard** — carbohydrate in the source data runs 0–761 g, and a typo'd 660 for 66 must not sail through. Prompt for pre-meal glucose: it lifts flag AUC from 0.836 to 0.885. |
 | **Risk card** | Probability, cohort band, predicted peak, curve. Use `describeRisk()` from the client for the wording. |
 | **Alternatives** | `edits[]`, smallest effective change first, each with `delta_probability`. `from_your_history[]` is the user's own past low-response meals — empty until they log some. **Empty `edits` means the meal is already in their lower range: say that, don't invent a suggestion.** |
 | **History** | `src/lib/storage.ts` already handles persistence. Log the *observed* outcome the user enters later, never the prediction. Show `personalization.meals_logged` climbing. |
 | **Learning curve** | Plot `meta.performance.learning_curve`. Seven real points measured on held-out people. Cheapest thing in the app and the most convincing. |
+| **Would a test help?** | Value of information. **Never tell a CGM wearer to get a glucose panel** — they already have continuous glucose. Lead with the analytes a draw actually adds: HbA1c and fasting insulin. Score 0 means say so and offer nothing. |
+| **Explanation** | Lazy-loaded under the numbers, so an external call can never delay the assessment. Show `source` — hiding whether Claude or the local template wrote it would misrepresent the system. |
 
 `Chart.tsx` is a hand-rolled SVG line chart used by both curves. No charting
 library: two series of under 30 points do not justify ~500 KB, and drawing it
@@ -71,7 +74,7 @@ entire effect the chart exists to show.
 
 ## Rules that are not style preferences
 
-**Never render numbers you hardcoded.** `n = 45`, AUC 0.888, the threshold, the
+**Never render numbers you hardcoded.** `n = 45`, AUC 0.885, the threshold, the
 disclaimer text — all come from `getMeta()`. They change when the model is
 retrained, and a hardcoded one becomes a false claim on stage.
 
@@ -111,10 +114,9 @@ do build a "delete my data" control; `clearEverything()` is already there.
 - Keep components presentational. Fetching lives in `src/api/client.ts`,
   persistence in `src/lib/storage.ts`.
 
-## When the real backend lands
+## Changing a response shape
 
-Nothing changes. `serve.py` implements the same contract and the proxy target is
-the same port. If a shape does change, it changes in `contract/openapi.json`
-first, `npm run gen:api` picks it up, and the compiler shows you what broke.
-`test_contract.py` on the Python side validates both backends against that one
-file, which is what makes this promise good.
+Change `contract/openapi.json` first, then `npm run gen:api`, and the compiler
+shows you every call site that broke. `test_contract.py --real` validates the
+stub *and* `serve.py` against that one file, and CI runs `check:api` so a stale
+generated type fails the build rather than surfacing at demo time.
