@@ -183,7 +183,7 @@ def personal_offset(labs: dict, history: list[dict],
     Each historical meal is re-scored with the population model and compared to
     what actually happened; the mean gap, shrunk by k/(k+5), is the correction.
     """
-    import personalize
+    import shrinkage as shrink
 
     residuals = []
     for entry in history or []:
@@ -197,4 +197,4 @@ def personal_offset(labs: dict, history: list[dict],
             continue
         residuals.append(float(observed) - predicted)
 
-    return personalize.offset_from_residuals(residuals), len(residuals)
+    return shrink.offset_from_residuals(residuals), len(residuals)

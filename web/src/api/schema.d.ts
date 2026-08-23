@@ -185,6 +185,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/lab-value": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Would drawing this person's bloods sharpen our predictions?
+         * @description Answers the value-of-information question, not a screening question. Measured over a grid of (has a glucose reading) x (which panel tier is on file). It recommends the core draw (HbA1c, fasting insulin, fasting glucose) rather than a full panel, because the lipid panel adds ~0.002 AUC and is worse than core without a glucose reading.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["LabValueRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LabValueResponse"];
+                    };
+                };
+                /** @description Unknown field, or a value outside its plausible range */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/explain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Narrate one assessment, grounded in the model's own attributions
+         * @description Always returns a usable explanation. `source` says whether it came from Claude or from the deterministic template fallback. The upstream call receives only feature names, attribution magnitudes and figures already displayed — never raw lab values or meal macros.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ExplainRequest"];
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ExplainResponse"];
+                    };
+                };
+                /** @description Unknown field, or a value outside its plausible range */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["Error"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -240,8 +344,8 @@ export interface components {
             meal: components["schemas"]["Meal"];
             /** @description mg/dL. Optional. Raises flag AUC from 0.841 to 0.888. */
             pre_meal_glucose?: number | null;
-            /** @default [] */
-            history: components["schemas"]["HistoryEntry"][];
+            /** @description Optional; the server uses [] when omitted. */
+            history?: components["schemas"]["HistoryEntry"][];
         };
         RiskFlag: {
             /** @constant */
@@ -295,13 +399,10 @@ export interface components {
             labs: components["schemas"]["LabPanel"];
             meal: components["schemas"]["Meal"];
             pre_meal_glucose?: number | null;
-            /** @default [] */
-            history: components["schemas"]["HistoryEntry"][];
-            /**
-             * @description Stop searching once an edit gets the probability below this.
-             * @default 0.4
-             */
-            target_probability: number;
+            /** @description Optional; the server uses [] when omitted. */
+            history?: components["schemas"]["HistoryEntry"][];
+            /** @description Stop searching once an edit gets the probability below this. Optional; the server uses 0.4 when omitted. */
+            target_probability?: number;
         };
         Edit: {
             /** @example About a third less carbohydrate */
@@ -387,6 +488,56 @@ export interface components {
             error: string;
             detail: string;
             field?: string | null;
+        };
+        LabValueRequest: {
+            labs: components["schemas"]["LabPanel"];
+            pre_meal_glucose?: number | null;
+        };
+        LabValueResponse: {
+            /** @description 0 = a draw would add nothing this model can use; 1 = it is running blind and a draw recovers the whole gap. */
+            score: number;
+            /** @enum {string} */
+            current_tier: "none" | "core" | "full";
+            /** @enum {string} */
+            recommended_tier: "none" | "core" | "full";
+            /** @description Null when nothing further would help. Do not invent a panel to fill the space. */
+            recommended_panel?: string | null;
+            missing_fields: string[];
+            auc_now: number;
+            auc_after_draw: number;
+            auc_gain?: number;
+            used_pre_meal_glucose?: boolean;
+            reason: string;
+            model_version: string;
+        };
+        ExplainRequest: {
+            labs: components["schemas"]["LabPanel"];
+            meal: components["schemas"]["Meal"];
+            pre_meal_glucose?: number | null;
+            /** @description Optional; the server uses [] when omitted. */
+            history?: components["schemas"]["HistoryEntry"][];
+        };
+        /** @description One feature attribution from the model. Carries no value — only how much this feature moved this prediction. */
+        Driver: {
+            feature: string;
+            label: string;
+            /** @enum {string} */
+            direction: "raises" | "lowers";
+            contribution: number;
+        };
+        ExplainResponse: {
+            headline: string;
+            drivers: string[];
+            caveat: string;
+            /**
+             * @description 'template' means the deterministic fallback was used — no API key, an upstream failure, or a response that failed validation. The UI may show this; it must not hide it.
+             * @enum {string}
+             */
+            source: "claude" | "template";
+            /** @description Present only when a live response was discarded. */
+            rejected_reason?: string;
+            drivers_used: components["schemas"]["Driver"][];
+            model_version: string;
         };
     };
     responses: never;

@@ -135,6 +135,34 @@ the personalisation mapping is learned from 45 subjects however many meals they
 each ate. The confidence intervals are bootstrapped over subjects for that
 reason. This is enough to demonstrate; it is not enough to claim.
 
+## The app
+
+```bash
+uvicorn serve:app                      # terminal 1
+cd web && npm install && npm run dev    # terminal 2 -> localhost:5173
+```
+
+Three tabs, one per pillar:
+
+- **Assess a meal** — macros in, calibrated probability of exceeding 140 mg/dL,
+  predicted peak and curve, then the changes that would lower it.
+- **Would a test help?** — value of information. Answers whether drawing bloods
+  would sharpen the prediction, and asks for the three analytes that carry the
+  signal rather than a full panel.
+- **Learning** — the measured learning curve, and a log of what actually happened
+  after meals you assessed.
+
+Under the numbers on the first tab, an **explanation** narrates what drove the
+estimate, built from the model's own SHAP attributions. It labels itself
+`written by Claude` or `generated locally` — the local template is the default
+path when no `ANTHROPIC_API_KEY` is set, and it is a supported path rather than a
+degraded one.
+
+Deployment: `Dockerfile` + `render.yaml` for the API, `web/` on Vercel with
+`VITE_API_BASE` pointing at it. The serving image is 5.6 MB of code and
+artifacts — it deliberately excludes the training modules, which is why the
+shrinkage maths lives in `shrinkage.py` rather than `personalize.py`.
+
 ## Serving
 
 `predict.py` is the whole serving surface. It reads **only** from `artifacts/` —

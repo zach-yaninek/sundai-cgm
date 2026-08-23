@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: sundai-cgm
-Version: 1.1.0
+Version: 1.1.1
 Summary: Glucose-response modelling on CGMacros, and the value of drawing labs
 Project-URL: Homepage, https://github.com/zach-yaninek/sundai-cgm
 Requires-Python: >=3.10

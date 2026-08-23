@@ -1,0 +1,28 @@
+# Keep the image to the serving path only.
+web/
+.git/
+.github/
+__pycache__/
+*.pyc
+
+# Training and analysis code the API never imports.
+cgm.py
+targets.py
+evaluate.py
+embed.py
+annotate.py
+predict.py
+information_value.py
+rung1_macros.py
+rung3_clip.py
+rung4_subject.py
+rung5_meal_risk.py
+test_*.py
+contract/
+
+# Rung 3 only, 3 MB, never loaded by serve.py.
+artifacts/clip_embeddings.npz
+artifacts/predictions.parquet
+artifacts/rung4_insample.parquet
+artifacts/rung5_insample.parquet
+personalize.py

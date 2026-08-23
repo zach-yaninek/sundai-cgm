@@ -32,13 +32,13 @@ import xgboost as xgb
 
 import evaluate
 import rung5_meal_risk as r5
+# The maths lives in a dependency-free module so the API container does not have
+# to import pandas, xgboost and the training code just to apply an offset.
+from shrinkage import LAMBDA, offset_from_residuals, shrinkage
 
 ARTIFACTS = Path(__file__).parent / "artifacts"
 
-# Shrinkage constant. 5 was chosen because the measured curve flattens around
-# k=5-10: most of the available gain arrives by the fifth logged meal, so a
-# constant that reaches half weight there tracks the evidence.
-LAMBDA = 5.0
+__all__ = ["LAMBDA", "shrinkage", "offset_from_residuals", "learning_curve"]
 
 # Sweep points for the published curve.
 CURVE_K = (0, 1, 2, 3, 5, 10, 15)
@@ -46,25 +46,6 @@ CURVE_K = (0, 1, 2, 3, 5, 10, 15)
 # A subject needs enough meals to both calibrate and be scored on the remainder.
 MIN_MEALS = 25
 HOLDOUT = 5
-
-
-def shrinkage(k: int, lam: float = LAMBDA) -> float:
-    """Weight given to a person's own history after ``k`` logged meals."""
-    return 0.0 if k <= 0 else k / (k + lam)
-
-
-def offset_from_residuals(residuals, lam: float = LAMBDA) -> float:
-    """The correction to add to a population prediction, already shrunk.
-
-    ``residuals`` are ``observed - predicted`` for meals the person has logged.
-    Returns 0.0 for an empty history — an app that "personalises" before it has
-    evidence is inventing the thing it claims to have learned.
-    """
-    residuals = np.asarray([r for r in residuals if r is not None and np.isfinite(r)],
-                           dtype=float)
-    if residuals.size == 0:
-        return 0.0
-    return float(residuals.mean() * shrinkage(residuals.size, lam))
 
 
 def learning_curve(*, target: str = "iauc", with_glucose: bool = True,

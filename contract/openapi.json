@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "sundai-cgm meal risk API",
-    "version": "1.1.0",
-    "description": "Assess a meal's likely glucose response for one person, suggest changes that lower it, and improve as that person logs meals.\n\nThe server is STATELESS. The client holds the lab panel and the meal history in browser localStorage and sends what is needed on each request; no personal health data is stored server-side.\n\nEvery number here comes from a model fitted to 45 people in one study (CGMacros, PhysioNet 2025). Cold-start AUC for the >140 mg/dL flag is 0.8854 with a pre-meal glucose reading and 0.8358 without. This is not a medical device and must not be used to inform an insulin dose.",
+    "version": "1.2.0",
+    "description": "Assess a meal's likely glucose response for one person, suggest changes that lower it, and improve as that person logs meals.\n\nThe server is STATELESS. The client holds the lab panel and the meal history in browser localStorage and sends what is needed on each request; no personal health data is stored server-side.\n\nEvery number here comes from a model fitted to 45 people in one study (CGMacros, PhysioNet 2025). Cold-start AUC for the >140 mg/dL flag is 0.8854 with a pre-meal glucose reading and 0.8358 without. This is not a medical device and must not be used to inform an insulin dose.\n\nv1.2.0 adds /api/lab-value (would drawing this person's bloods sharpen our predictions) and /api/explain (a narration of one assessment, grounded in the model's own feature attributions). The explanation endpoint never receives raw lab values or meal macros \u2014 only attribution magnitudes and figures already shown to the user.",
     "license": {
       "name": "MIT (code); data CC BY-NC-SA 4.0"
     }
@@ -109,6 +109,82 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AlternativesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown field, or a value outside its plausible range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/lab-value": {
+      "post": {
+        "summary": "Would drawing this person's bloods sharpen our predictions?",
+        "description": "Answers the value-of-information question, not a screening question. Measured over a grid of (has a glucose reading) x (which panel tier is on file). It recommends the core draw (HbA1c, fasting insulin, fasting glucose) rather than a full panel, because the lipid panel adds ~0.002 AUC and is worse than core without a glucose reading.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LabValueRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabValueResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unknown field, or a value outside its plausible range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/explain": {
+      "post": {
+        "summary": "Narrate one assessment, grounded in the model's own attributions",
+        "description": "Always returns a usable explanation. `source` says whether it came from Claude or from the deterministic template fallback. The upstream call receives only feature names, attribution magnitudes and figures already displayed \u2014 never raw lab values or meal macros.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExplainRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExplainResponse"
                 }
               }
             }
@@ -313,7 +389,7 @@
             "items": {
               "$ref": "#/components/schemas/HistoryEntry"
             },
-            "default": []
+            "description": "Optional; the server uses [] when omitted."
           }
         }
       },
@@ -490,14 +566,13 @@
             "items": {
               "$ref": "#/components/schemas/HistoryEntry"
             },
-            "default": []
+            "description": "Optional; the server uses [] when omitted."
           },
           "target_probability": {
             "type": "number",
             "minimum": 0,
             "maximum": 1,
-            "default": 0.4,
-            "description": "Stop searching once an edit gets the probability below this."
+            "description": "Stop searching once an edit gets the probability below this. Optional; the server uses 0.4 when omitted."
           }
         }
       },
@@ -767,6 +842,190 @@
           "field": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "LabValueRequest": {
+        "type": "object",
+        "required": [
+          "labs"
+        ],
+        "properties": {
+          "labs": {
+            "$ref": "#/components/schemas/LabPanel"
+          },
+          "pre_meal_glucose": {
+            "type": "number",
+            "nullable": true,
+            "minimum": 40,
+            "maximum": 400
+          }
+        }
+      },
+      "LabValueResponse": {
+        "type": "object",
+        "required": [
+          "score",
+          "current_tier",
+          "recommended_tier",
+          "missing_fields",
+          "auc_now",
+          "auc_after_draw",
+          "reason",
+          "model_version"
+        ],
+        "properties": {
+          "score": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "0 = a draw would add nothing this model can use; 1 = it is running blind and a draw recovers the whole gap."
+          },
+          "current_tier": {
+            "type": "string",
+            "enum": [
+              "none",
+              "core",
+              "full"
+            ]
+          },
+          "recommended_tier": {
+            "type": "string",
+            "enum": [
+              "none",
+              "core",
+              "full"
+            ]
+          },
+          "recommended_panel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Null when nothing further would help. Do not invent a panel to fill the space."
+          },
+          "missing_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "auc_now": {
+            "type": "number"
+          },
+          "auc_after_draw": {
+            "type": "number"
+          },
+          "auc_gain": {
+            "type": "number"
+          },
+          "used_pre_meal_glucose": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "model_version": {
+            "type": "string"
+          }
+        }
+      },
+      "ExplainRequest": {
+        "type": "object",
+        "required": [
+          "labs",
+          "meal"
+        ],
+        "properties": {
+          "labs": {
+            "$ref": "#/components/schemas/LabPanel"
+          },
+          "meal": {
+            "$ref": "#/components/schemas/Meal"
+          },
+          "pre_meal_glucose": {
+            "type": "number",
+            "nullable": true
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            },
+            "description": "Optional; the server uses [] when omitted."
+          }
+        }
+      },
+      "Driver": {
+        "type": "object",
+        "required": [
+          "feature",
+          "label",
+          "direction",
+          "contribution"
+        ],
+        "description": "One feature attribution from the model. Carries no value \u2014 only how much this feature moved this prediction.",
+        "properties": {
+          "feature": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "raises",
+              "lowers"
+            ]
+          },
+          "contribution": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "ExplainResponse": {
+        "type": "object",
+        "required": [
+          "headline",
+          "drivers",
+          "caveat",
+          "source",
+          "drivers_used",
+          "model_version"
+        ],
+        "properties": {
+          "headline": {
+            "type": "string"
+          },
+          "drivers": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "caveat": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "template"
+            ],
+            "description": "'template' means the deterministic fallback was used \u2014 no API key, an upstream failure, or a response that failed validation. The UI may show this; it must not hide it."
+          },
+          "rejected_reason": {
+            "type": "string",
+            "description": "Present only when a live response was discarded."
+          },
+          "drivers_used": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Driver"
+            }
+          },
+          "model_version": {
+            "type": "string"
           }
         }
       }

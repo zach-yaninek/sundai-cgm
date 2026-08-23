@@ -124,6 +124,35 @@ def check(client, name):
                                             "meal": {**MEAL, "carbs": 6600}})
     ok(typo.status_code == 422, f"{name}: an out-of-range macro is refused (422)")
 
+    # ---- pillar 2: value of information -------------------------------------
+    blind = client.post("/api/lab-value",
+                        json={"labs": {}, "pre_meal_glucose": 104}).json()
+    validate(blind, "LabValueResponse", f"{name} /api/lab-value")
+    covered = client.post("/api/lab-value", json={
+        "labs": {"a1c_pdl_lab": 5.6, "insulin": 6.0, "fasting_glu___pdl_lab": 95},
+        "pre_meal_glucose": 104}).json()
+    ok(blind["score"] == 1.0 and covered["score"] == 0.0,
+       f"{name}: lab-value is 1.0 with no labs and 0.0 with a core panel on file")
+    ok(covered["recommended_panel"] is None,
+       f"{name}: no panel is recommended when a draw would not help")
+    ok(blind["recommended_tier"] != "full",
+       f"{name}: never asks for a full panel (lipids add ~0.002 AUC)")
+    ok(blind["auc_after_draw"] > blind["auc_now"],
+       f"{name}: the quoted gain is a real AUC gap")
+
+    # ---- pillar 4: explanations ---------------------------------------------
+    narration = client.post("/api/explain", json=body).json()
+    validate(narration, "ExplainResponse", f"{name} /api/explain")
+    ok(narration["source"] in ("claude", "template"),
+       f"{name}: explanation declares its source ({narration['source']})")
+    ok(len(narration["drivers_used"]) > 0,
+       f"{name}: explanation carries the attributions it was built from")
+    banned = ("dangerous", "diagnos", "you should eat")
+    blob = (narration["headline"] + " ".join(narration["drivers"])
+            + narration["caveat"]).lower()
+    ok(not any(b in blob for b in banned),
+       f"{name}: explanation contains no banned phrasing")
+
     # No returned meal may carry a field the contract does not define.
     allowed = set(SPEC["components"]["schemas"]["Meal"]["properties"])
     extra = {k for e in alts["edits"] for k in e.get("resulting_meal", {})} - allowed

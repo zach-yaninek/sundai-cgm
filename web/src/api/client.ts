@@ -28,6 +28,9 @@ export type Edit = components["schemas"]["Edit"];
 export type RiskFlag = components["schemas"]["RiskFlag"];
 export type CurvePoint = components["schemas"]["CurvePoint"];
 export type Confidence = components["schemas"]["Confidence"];
+export type LabValueResponse = components["schemas"]["LabValueResponse"];
+export type ExplainResponse = components["schemas"]["ExplainResponse"];
+export type Driver = components["schemas"]["Driver"];
 export type MealType = NonNullable<Meal["meal_type"]>;
 export type ConfidenceBand = NonNullable<Confidence["band"]>;
 
@@ -43,7 +46,11 @@ export class ApiError extends Error {
   }
 }
 
-const BASE = "/api"; // vite proxies this to the Python backend
+// In dev, Vite proxies "/api" to the local backend. In a static build there is
+// no proxy, so the deployed frontend needs the API's absolute origin.
+const BASE = import.meta.env.VITE_API_BASE
+  ? `${String(import.meta.env.VITE_API_BASE).replace(/\/$/, "")}/api`
+  : "/api";
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
@@ -101,6 +108,20 @@ export const alternatives = (body: AlternativesRequest) =>
     method: "POST",
     body: JSON.stringify(body),
   });
+
+/** Would drawing this person's bloods sharpen what we can tell them? */
+export const labValue = (body: { labs: LabPanel; pre_meal_glucose?: number | null }) =>
+  request<LabValueResponse>("/lab-value", { method: "POST", body: JSON.stringify(body) });
+
+/**
+ * Narration of one assessment.
+ *
+ * Always resolves — the backend falls back to a deterministic template when
+ * there is no API key or a response fails validation. Check `source` and show
+ * it; hiding which one produced the text would misrepresent the system.
+ */
+export const explain = (body: AssessRequest) =>
+  request<ExplainResponse>("/explain", { method: "POST", body: JSON.stringify(body) });
 
 // ---- Small helpers the UI will want ---------------------------------------
 

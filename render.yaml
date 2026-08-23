@@ -1,0 +1,19 @@
+# Render blueprint for the API. Connecting the repo is the only manual step.
+#
+# After the first deploy, set VITE_API_BASE on Vercel to this service's URL and
+# add that Vercel URL to ALLOWED_ORIGINS below — the two have to know each other.
+services:
+  - type: web
+    name: sundai-cgm-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/meta
+    envVars:
+      # Comma-separated. Add the deployed frontend origin once Vercel gives you one.
+      - key: ALLOWED_ORIGINS
+        value: http://localhost:5173,http://127.0.0.1:5173
+      # Optional. Without it the explanation endpoint uses its deterministic
+      # template, which is a supported path rather than a degraded one.
+      - key: ANTHROPIC_API_KEY
+        sync: false

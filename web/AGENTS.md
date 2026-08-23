@@ -1,9 +1,11 @@
-# web/ — instructions for the coding agent building this frontend
+# web/ — working notes
 
-You own everything under `web/`. You do not touch Python, the model, or
-`artifacts/`. Someone else is building the backend in parallel against a frozen
-contract, so as long as you follow the rules below your work and theirs will
-merge without conflicts and without runtime surprises.
+The app is built. These are the rules that keep it honest, and the traps worth
+knowing before changing anything.
+
+Three pillars, one per tab: **assess a meal**, **would a blood test help**, and
+**learning**. A fourth thing — the explanation panel — sits under the numbers on
+the first tab.
 
 ## Run it
 
@@ -59,8 +61,13 @@ Six screens. `src/components/` has a stub for each with a TODO.
 | **History** | `src/lib/storage.ts` already handles persistence. Log the *observed* outcome the user enters later, never the prediction. Show `personalization.meals_logged` climbing. |
 | **Learning curve** | Plot `meta.performance.learning_curve`. Seven real points measured on held-out people. Cheapest thing in the app and the most convincing. |
 
-No charting library is installed — add one if you want (`recharts` is fine), or
-hand-roll SVG. Two small line charts is not much either way.
+`Chart.tsx` is a hand-rolled SVG line chart used by both curves. No charting
+library: two series of under 30 points do not justify ~500 KB, and drawing it
+ourselves is what lets a wide confidence band render as a dashed, faded line.
+
+**`zeroBaseline` matters.** The glucose curve anchors at zero; the learning curve
+must not. Forcing zero there squashes 28.7 → 23.4 into a flat line and hides the
+entire effect the chart exists to show.
 
 ## Rules that are not style preferences
 

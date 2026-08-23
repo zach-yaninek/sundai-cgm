@@ -3,7 +3,7 @@
     uv run --with fastapi --with uvicorn --with numpy --with xgboost python serve.py
     # or: pip install fastapi uvicorn && python serve.py
 
-Same four endpoints and the same response shapes as `contract/stub_server.py`, so
+Same six endpoints and the same response shapes as `contract/stub_server.py`, so
 the frontend switches over by changing nothing at all. `test_contract.py --real`
 validates both against `contract/openapi.json`.
 
@@ -14,6 +14,7 @@ true as long as this file stays free of storage.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -21,17 +22,30 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-import personalize
+import explain
 import recommend
 import risk
+# Only the shrinkage maths, not personalize.py — that module imports pandas,
+# xgboost and the training code to *measure* the learning curve, none of which
+# the serving container should have to carry.
+import shrinkage as shrink
+from sundai_cgm import value_of_information
 
 HERE = Path(__file__).parent
 ARTIFACTS = HERE / "artifacts"
 
 app = FastAPI(title="sundai-cgm meal risk API", version="1.0.0")
+# Deployed, the frontend is on a different origin, so the allowed list has to be
+# configurable. Defaults to the local dev server so nothing changes locally.
+ALLOWED_ORIGINS = [
+    o.strip() for o in os.environ.get(
+        "ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    ).split(",") if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -158,7 +172,7 @@ def _assemble(scored: dict, labs: dict, history: list, offset: float,
         "personalization": {
             "meals_logged": k,
             "offset_applied": round(offset, 1),
-            "shrinkage": round(personalize.shrinkage(k), 3),
+            "shrinkage": round(shrink.shrinkage(k), 3),
             **({"expected_mae": expected} if expected is not None else {}),
         },
         "confidence": {
@@ -289,6 +303,45 @@ def alternatives(body: dict):
         "note": result["note"],
         "model_version": MODEL_VERSION,
     }
+
+
+@app.post("/api/lab-value")
+def lab_value(body: dict):
+    """Would drawing this person's bloods sharpen what we can tell them?"""
+    labs = body.get("labs") or {}
+    pre = body.get("pre_meal_glucose")
+
+    problem = _validate(labs, {}, pre)
+    if problem:
+        return _error(problem)
+
+    assessment = value_of_information(labs, pre)
+    return {**assessment, "model_version": MODEL_VERSION}
+
+
+@app.post("/api/explain")
+def explain_assessment(body: dict):
+    """Narrate one assessment. Never fails — falls back to a template."""
+    labs = body.get("labs") or {}
+    meal = body.get("meal") or {}
+    pre = body.get("pre_meal_glucose")
+    history = body.get("history") or []
+
+    problem = _validate(labs, meal, pre)
+    if problem:
+        return _error(problem)
+
+    try:
+        offset, _ = recommend.personal_offset(labs, history, pre)
+        assessment = risk.score(labs, meal, pre, offset=offset)
+        result = explain.explain(labs, meal, pre, assessment)
+    except ValueError as exc:
+        return _error(str(exc), field="meal", code="invalid_meal")
+    except risk.ArtifactError as exc:
+        return JSONResponse(status_code=503,
+                            content={"error": "artifacts_unavailable",
+                                     "detail": str(exc), "field": None})
+    return {**result, "model_version": MODEL_VERSION}
 
 
 if __name__ == "__main__":

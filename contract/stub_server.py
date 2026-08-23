@@ -327,6 +327,83 @@ def alternatives(body: dict):
     }
 
 
+@app.post("/api/lab-value")
+def lab_value(body: dict):
+    labs = body.get("labs") or {}
+    pre = body.get("pre_meal_glucose")
+
+    problem = _validate(labs, {}, pre)
+    if problem:
+        return JSONResponse(status_code=422,
+                            content={"error": "invalid_request",
+                                     "detail": problem, "field": None})
+
+    core = ("a1c_pdl_lab", "insulin", "fasting_glu___pdl_lab")
+    missing = [f for f in core if labs.get(f) is None]
+    tier = "none" if len(missing) == len(core) else ("core" if missing else "core")
+    on_file = not missing
+    auc_now = 0.887 if on_file else (0.846 if pre is not None else 0.680)
+    auc_after = 0.887 if pre is not None else 0.842
+    floor = 0.846 if pre is not None else 0.680
+    span = auc_after - floor
+    score = 0.0 if on_file else round(min(max((auc_after - auc_now) / span, 0), 1), 3)
+
+    return {
+        "score": score,
+        "current_tier": "core" if on_file else "none",
+        "recommended_tier": "core",
+        "recommended_panel": None if on_file else
+                             "HbA1c, fasting insulin and fasting glucose",
+        "missing_fields": missing,
+        "auc_now": auc_now, "auc_after_draw": auc_after,
+        "auc_gain": round(max(0.0, auc_after - auc_now), 4),
+        "used_pre_meal_glucose": pre is not None,
+        "reason": ("A recent panel is already on file; drawing again would not improve "
+                   "what this model can say about their meals."
+                   if on_file else
+                   f"{len(missing)} of the analytes this model relies on are unknown. "
+                   f"Drawing HbA1c, fasting insulin and fasting glucose would move the "
+                   f"meal-response flag from AUC {auc_now:.3f} to {auc_after:.3f}."),
+        "model_version": STUB_VERSION,
+    }
+
+
+@app.post("/api/explain")
+def explain_assessment(body: dict):
+    """Fixture narration. Shape-identical to the real endpoint's template path."""
+    labs = body.get("labs") or {}
+    meal = body.get("meal") or {}
+    pre = body.get("pre_meal_glucose")
+
+    problem = _validate(labs, meal, pre)
+    if problem:
+        return JSONResponse(status_code=422,
+                            content={"error": "invalid_request",
+                                     "detail": problem, "field": None})
+
+    probability, _ = _risk(labs, meal, pre)
+    pct = round(probability * 100)
+    carbs = float(meal.get("carbs") or 0)
+    drivers_used = [
+        {"feature": "carbs", "label": "carbohydrate in the meal",
+         "direction": "raises", "contribution": 0.882},
+        {"feature": "a1c_pdl_lab", "label": "HbA1c",
+         "direction": "raises", "contribution": 0.733},
+    ]
+    band = _confidence(labs, pre)["band"]
+    return {
+        "headline": f"This model puts the chance of going above 140 mg/dL at {pct}%, "
+                    f"driven most by carbohydrate in the meal.",
+        "drivers": [f"{d['label']} {d['direction']} the estimate" for d in drivers_used],
+        "caveat": ("Fitted to 45 people in one study"
+                   + (", and several inputs were filled from cohort medians here."
+                      if band == "wide" else ".")),
+        "source": "template",
+        "drivers_used": drivers_used,
+        "model_version": STUB_VERSION,
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
 

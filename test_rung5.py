@@ -183,6 +183,77 @@ _partial = sundai_cgm.value_of_information({"a1c_pdl_lab": 6.2}, 104)
 ok(blind["score"] >= _partial["score"] >= covered["score"],
    "score falls monotonically as more analytes become known")
 
+# --------------------------------------------------------------- explanations
+print("\n-- explanations (guardrails, no credentials needed)")
+import explain
+
+_attr = explain.drivers(RESISTANT, MEAL, 104)
+_assess = risk.score(RESISTANT, MEAL, 104)
+_payload = explain.build_payload(_assess, _attr, meal_type="dinner")
+
+ok(len(_attr) > 0 and all("contribution" in d for d in _attr),
+   f"real SHAP attributions are produced ({len(_attr)} drivers)")
+ok(all("value" not in d for d in _attr),
+   "attributions carry no feature values, only magnitudes")
+
+# The privacy property: no lab or macro value may appear as a token upstream.
+import json as _js
+import re as _re
+_tokens = set(_re.findall(r"\d+(?:\.\d+)?", _js.dumps(_payload)))
+_secret = {**RESISTANT, **{k: v for k, v in MEAL.items() if k != "meal_type"}}
+_leaked = [k for k, v in _secret.items()
+           if isinstance(v, (int, float)) and v > 10
+           and (str(v) in _tokens or str(float(v)) in _tokens or str(int(v)) in _tokens)]
+ok(not _leaked, f"payload leaks no lab or macro value upstream (found {_leaked})")
+
+_clean = {"headline": "This model puts the chance above 140 mg/dL at 90%.",
+          "drivers": ["carbohydrate raises it"], "caveat": "Fitted to 45 people."}
+ok(explain.validate(_clean, _payload)[0], "a clean response validates")
+for _bad, _why in [
+    ({**_clean, "headline": "Your HbA1c of 6.2 drives this."}, "an invented number is rejected"),
+    ({**_clean, "caveat": "This is a dangerous meal."}, "'dangerous' is rejected"),
+    ({**_clean, "drivers": ["you should eat less rice"]}, "dietary advice is rejected"),
+    ({"headline": "x", "drivers": []}, "a malformed response is rejected"),
+]:
+    ok(not explain.validate(_bad, _payload)[0], _why)
+
+_template = explain.template_explanation(_payload)
+ok(explain.validate(_template, _payload)[0],
+   "the fallback template passes its own validation")
+ok("140" in _template["headline"] and "45" in _template["caveat"],
+   "the fallback names the threshold and the cohort size")
+
+# With no client and no credentials, explain() must still return something usable.
+_result = explain.explain(RESISTANT, MEAL, 104, _assess)
+ok(_result["source"] == "template" if not explain.available() else True,
+   f"explain() degrades to the template without credentials (source={_result['source']})")
+ok(bool(_result["headline"]) and bool(_result["caveat"]),
+   "explain() always returns a usable explanation")
+
+
+class _FakeClient:
+    """Stands in for the SDK so the live path is testable without a key."""
+
+    def __init__(self, payload):
+        self._payload = payload
+        self.messages = self
+
+    def create(self, **kwargs):
+        import types
+        block = types.SimpleNamespace(type="text", text=_js.dumps(self._payload))
+        return types.SimpleNamespace(content=[block], stop_reason="end_turn")
+
+
+explain._CACHE.clear()
+_good = explain.explain(RESISTANT, MEAL, 104, _assess, client=_FakeClient(_clean))
+ok(_good["source"] == "claude", "a valid live response is used")
+
+explain._CACHE.clear()
+_bad_live = explain.explain(RESISTANT, MEAL, 104, _assess,
+                            client=_FakeClient({**_clean, "caveat": "dangerous meal"}))
+ok(_bad_live["source"] == "template" and "rejected_reason" in _bad_live,
+   f"a live response that breaks a rule is discarded ({_bad_live.get('rejected_reason')})")
+
 print("\n" + "=" * 60)
 if FAILURES:
     print(f"{len(FAILURES)} FAILED:")
