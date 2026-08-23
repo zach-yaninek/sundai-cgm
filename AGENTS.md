@@ -58,6 +58,21 @@ artifact file type, check it is not silently ignored.
 - `targets.modelling_set()` prints its funnel every run. The honest n is
   **1,382**, not the 1,706 headline. Quote the printed number.
 
+## The API layer
+
+`contract/openapi.json` is the frozen contract between the Python side and the
+React app in `web/`. `contract/stub_server.py` implements it with fixtures so the
+frontend can be built before the model exists; `serve.py` will implement the same
+shapes for real.
+
+**If you change a response shape, change `openapi.json` first.** `test_contract.py`
+validates the stub and the real backend against that one file — that is the only
+thing stopping the frontend being built against a shape the backend never returns.
+
+The server is stateless by design: the lab panel and meal history live in browser
+localStorage and are sent per request. Do not add server-side storage of personal
+health data.
+
 ## Licences
 
 Code is MIT. **CGMacros is CC BY-NC-SA 4.0** — non-commercial, share-alike;

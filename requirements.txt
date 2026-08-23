@@ -9,3 +9,8 @@ xgboost>=2.0
 # rung 3 only (CLIP embeddings). Not needed for the loader, targets or rung 1.
 # open_clip_torch>=2.24
 # torch>=2.0
+
+# API layer (serve.py / contract/stub_server.py) — not needed for the model work
+# fastapi>=0.110
+# uvicorn>=0.27
+# jsonschema>=4.0   # test_contract.py only
