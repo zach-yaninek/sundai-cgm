@@ -126,6 +126,34 @@ ok(recommend.personal_offset(RESISTANT, [], 104) == (0.0, 0),
 ok(recommend.personal_offset(RESISTANT, [{"meal": MEAL}], 104)[1] == 0,
    "an entry with no observed outcome is not evidence")
 
+# The history form asks what glucose PEAKED at, because that is the number a
+# person can read off a CGM; the offset is defined on iAUC. An entry carrying
+# only a peak used to be skipped, so k stayed 0 and the app never personalised
+# however much was logged, while the UI counted the meals up. These pin the
+# conversion, because nothing failed when it was missing.
+peak_hist = [{"meal": MEAL, "observed_peak": 195.0, "pre_meal_glucose": 104}] * 3
+peak_offset, peak_k = recommend.personal_offset(RESISTANT, peak_hist, 104)
+ok(peak_k == 3, f"an outcome logged as a peak is evidence, not a skipped row (k={peak_k})")
+ok(peak_offset > 0,
+   f"peaks above what was predicted raise the estimate ({peak_offset:+.1f})")
+
+low_hist = [{"meal": MEAL, "observed_peak": 118.0, "pre_meal_glucose": 104}] * 3
+low_offset, low_k = recommend.personal_offset(RESISTANT, low_hist, 104)
+ok(low_k == 3 and low_offset < 0,
+   f"peaks below what was predicted lower it ({low_offset:+.1f})")
+
+# A measured iAUC must still win outright: converting is the fallback, and a
+# reading that needs no conversion should not be routed through one.
+_scored = risk.score(RESISTANT, MEAL, 104)
+ok(recommend.observed_iauc({"observed_iauc": 42.0, "observed_peak": 300.0},
+                           RESISTANT, _scored) == 42.0,
+   "a measured iAUC is used as-is, never re-derived from the peak")
+ok(recommend.observed_iauc({"observed_peak": 90.0, "pre_meal_glucose": 104},
+                           RESISTANT, _scored) == 0.0,
+   "a peak below baseline is a real observation of no rise, clipped at zero")
+ok(recommend.observed_iauc({}, RESISTANT, _scored) is None,
+   "an entry with neither reading converts to nothing")
+
 # --------------------------------------------------------------- recommender
 print("\n-- recommender")
 result = recommend.suggest(RESISTANT, MEAL, 104)

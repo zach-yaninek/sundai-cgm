@@ -176,25 +176,85 @@ def from_history(history: list[dict], meal_type: str, *,
     return scored[:limit]
 
 
+# Fallback baseline when a history entry carries neither a pre-meal reading nor a
+# fasting glucose: the cohort's fasting median. Matches serve.py's curve baseline
+# so a peak means the same thing everywhere it is used.
+DEFAULT_BASELINE_MGDL = 97.0
+
+
+def _baseline(labs: dict, pre_meal_glucose: float | None) -> float:
+    """What a peak is measured *above* for this person."""
+    for value in (pre_meal_glucose, (labs or {}).get("fasting_glu___pdl_lab")):
+        if value is not None:
+            return float(value)
+    return DEFAULT_BASELINE_MGDL
+
+
+def observed_iauc(entry: dict, labs: dict, scored: dict) -> float | None:
+    """The logged outcome as iAUC, converting from a peak reading if that is all
+    there is.
+
+    This exists because the two halves of the app disagree about what an outcome
+    *is*, and did so silently. The history form asks what someone's glucose
+    peaked at, because that is the number a person can actually read off a CGM;
+    the offset is defined on iAUC, because that is the target the model was
+    fitted and the learning curve measured on. An entry carrying only a peak used
+    to be skipped, so k stayed 0 and the app never personalised however much was
+    logged - while the UI counted the meals up.
+
+    The conversion uses the model's own two heads rather than a fitted constant:
+    `risk.score` predicts a peak and an iAUC for this same meal, so their ratio
+    is this prediction's own shape, and the observed peak is scaled through it.
+    Reported peak_delta and iauc correlate 0.953 in this cohort, which is what
+    makes the proportionality defensible - but it *is* an approximation, and a
+    residual derived this way is weaker evidence than a measured iAUC. It is not
+    downweighted separately: shrinkage already holds any small k near zero.
+    """
+    iauc = entry.get("observed_iauc")
+    if iauc is not None:
+        return float(iauc)
+
+    peak = entry.get("observed_peak")
+    if peak is None:
+        return None
+
+    baseline = _baseline(labs, entry.get("pre_meal_glucose"))
+    predicted_peak_delta = scored["predicted_peak_mgdl"] - baseline
+    # No usable ratio if the model predicts no rise at all. Skipping is right:
+    # inventing a conversion factor here would put a fabricated residual into the
+    # mean, which is the one thing the offset must never contain.
+    if predicted_peak_delta <= 1e-6:
+        return None
+
+    observed_peak_delta = float(peak) - baseline
+    ratio = scored["predicted_iauc"] / predicted_peak_delta
+    # iAUC is area *above* baseline and cannot be negative; a peak at or below
+    # baseline is a real observation of no rise, not a reason to drop the entry.
+    return max(0.0, observed_peak_delta * ratio)
+
+
 def personal_offset(labs: dict, history: list[dict],
                     pre_meal_glucose: float | None = None) -> tuple[float, int]:
     """Shrunk correction from a user's logged outcomes. Returns (offset, k).
 
     Each historical meal is re-scored with the population model and compared to
     what actually happened; the mean gap, shrunk by k/(k+5), is the correction.
+    Outcomes logged as a peak are converted to iAUC first - see observed_iauc().
     """
     import shrinkage as shrink
 
     residuals = []
     for entry in history or []:
         meal = entry.get("meal") or {}
-        observed = entry.get("observed_iauc")
-        if observed is None or not meal.get("carbs") or not meal.get("meal_type"):
+        if not meal.get("carbs") or not meal.get("meal_type"):
             continue
         try:
-            predicted = risk.score(labs, meal, entry.get("pre_meal_glucose"))["predicted_iauc"]
+            scored = risk.score(labs, meal, entry.get("pre_meal_glucose"))
         except (ValueError, KeyError):
             continue
-        residuals.append(float(observed) - predicted)
+        observed = observed_iauc(entry, labs, scored)
+        if observed is None:
+            continue
+        residuals.append(observed - scored["predicted_iauc"])
 
     return shrink.offset_from_residuals(residuals), len(residuals)
