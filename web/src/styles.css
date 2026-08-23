@@ -285,6 +285,29 @@ button.link {
 .panel-name { font-size: 15px; font-weight: 600; margin: 4px 0 0; }
 .analytes { display: flex; flex-wrap: wrap; gap: 7px; list-style: none; padding: 0; margin: 10px 0 0; }
 .analytes li { background: var(--surface); border: 1px solid var(--rule); border-radius: 3px; padding: 3px 8px; font-size: 12.5px; }
+/* The analyte a CGM already covers is listed, but must not read as the ask. */
+.analytes li.covered { color: var(--muted); border-style: dashed; }
+
+/* The answer, in words, before any measurement of it. */
+.verdict { font-size: 1.35rem; letter-spacing: -0.02em; margin: 18px 0 0; }
+.labvalue.worth .verdict { color: var(--accent); }
+.labvalue.not-worth .verdict { color: var(--low); }
+.plain-accuracy { font-size: 14.5px; color: var(--muted); margin: 14px 0 0; max-width: 64ch; }
+.plain-accuracy strong { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* Detail is one click away, never gone — the claim above rests on it. */
+.more { margin-top: 20px; border-top: 1px solid var(--rule); padding-top: 14px; }
+.more summary {
+  cursor: pointer; font-size: 13.5px; color: var(--accent);
+  list-style: none; display: inline-flex; align-items: center; gap: 6px;
+}
+.more summary::-webkit-details-marker { display: none; }
+.more summary::before { content: "+"; font-variant-numeric: tabular-nums; }
+.more[open] summary::before { content: "\2212"; }
+.more summary:hover { text-decoration: underline; }
+.more summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+.more-body { margin-top: 12px; }
+.more-body > p:first-child { font-size: 13.5px; color: var(--muted); margin: 0; max-width: 64ch; }
 
 /* ---- history ------------------------------------------------------------ */
 

@@ -361,7 +361,8 @@ def lab_value(body: dict):
         "reason": ("A recent panel is already on file; drawing again would not improve "
                    "what this model can say about their meals."
                    if on_file else
-                   f"{len(missing)} of the analytes this model relies on are unknown. "
+                   f"{len(missing)} of the analytes this model relies on "
+                   f"{'is' if len(missing) == 1 else 'are'} unknown. "
                    f"Drawing HbA1c, fasting insulin and fasting glucose would move the "
                    f"meal-response flag from AUC {auc_now:.3f} to {auc_after:.3f}."),
         "model_version": STUB_VERSION,

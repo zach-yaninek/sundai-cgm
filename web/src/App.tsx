@@ -14,6 +14,7 @@ import {
   ApiError,
   assess,
   explain as fetchExplain,
+  getFields,
   getMeta,
   labValue as fetchLabValue,
 } from "./api/client";
@@ -21,6 +22,7 @@ import type {
   AlternativesResponse,
   AssessResponse,
   ExplainResponse,
+  Field,
   HistoryEntry,
   LabPanel,
   LabValueResponse,
@@ -52,6 +54,11 @@ const DEFAULT_MEAL: Meal = {
 
 export default function App() {
   const [meta, setMeta] = useState<Meta | null>(null);
+  // Fetched once here rather than inside each component that needs it: the lab
+  // form and the blood-test screen both label fields from it, and two copies of
+  // the same list is how the two screens start naming the same analyte
+  // differently.
+  const [fields, setFields] = useState<Field[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [consented, setConsented] = useState(false);
 
@@ -77,6 +84,16 @@ export default function App() {
       .catch((e: unknown) =>
         setError(e instanceof ApiError ? e.message : String(e)),
       );
+  }, []);
+
+  useEffect(() => {
+    getFields()
+      .then((f) =>
+        setFields([...f.fields].sort(
+          (a, b) => (a.importance_rank ?? 99) - (b.importance_rank ?? 99),
+        )),
+      )
+      .catch(() => setFields([]));
   }, []);
 
   const updateLabs = useCallback((next: LabPanel, glucose: number | null) => {
@@ -158,6 +175,7 @@ export default function App() {
         {!consented ? (
           <OnboardLabs
             meta={meta}
+            fields={fields}
             labs={labs}
             preMealGlucose={preMealGlucose}
             onChange={updateLabs}
@@ -193,6 +211,7 @@ export default function App() {
               <>
                 <OnboardLabs
                   meta={meta}
+                  fields={fields}
                   labs={labs}
                   preMealGlucose={preMealGlucose}
                   onChange={updateLabs}
@@ -206,7 +225,9 @@ export default function App() {
               </>
             )}
 
-            {tab === "bloods" && <LabValue data={bloods} />}
+            {tab === "bloods" && (
+              <LabValue data={bloods} meta={meta} fields={fields} />
+            )}
 
             {tab === "learning" && (
               <>

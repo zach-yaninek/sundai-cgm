@@ -118,7 +118,8 @@ def value_of_information(labs: dict | None = None,
         panel = ("HbA1c, fasting insulin and fasting glucose"
                  if target_tier == "core" else "full metabolic and lipid panel")
         reason = (
-            f"{len(missing)} of the analytes this model relies on are unknown. "
+            f"{len(missing)} of the analytes this model relies on "
+            f"{'is' if len(missing) == 1 else 'are'} unknown. "
             f"Drawing {panel} would move the meal-response flag from "
             f"AUC {current:.3f} to {target:.3f}"
             + (" for someone already wearing a CGM."

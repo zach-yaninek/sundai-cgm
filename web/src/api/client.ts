@@ -154,3 +154,84 @@ export function bandWeight(band: ConfidenceBand): { label: string; hint: string 
       return { label: "Very rough estimate", hint: "Most values were filled in. Treat as indicative only." };
   }
 }
+
+/**
+ * The lab-value screen in plain language.
+ *
+ * The API speaks in AUC because that is what was measured. AUC has an exact
+ * lay reading, though — it is how often the model, shown one meal that crossed
+ * the threshold and one that did not, picks the right one. So the lead copy
+ * states that, and the AUC figures themselves move behind the disclosure.
+ *
+ * Nothing here is a number this file invented: `nowInHundred` and
+ * `afterInHundred` are the API's own AUCs, restated on a scale people read
+ * without training.
+ */
+export interface LabValueCopy {
+  /** Short answer to the question the tab asks. */
+  verdict: string;
+  /** Why, without jargon. */
+  plain: string;
+  /** AUC now and after the draw, as "picks the right one N times in 100". */
+  nowInHundred: number;
+  afterInHundred: number;
+  /** Whether a draw is worth recommending at all. */
+  worthwhile: boolean;
+}
+
+/** Small counts read better spelled out mid-sentence, and never open one as a digit. */
+const COUNT_WORDS = ["no", "one", "two", "three", "four", "five", "six", "seven"];
+const spell = (n: number): string => COUNT_WORDS[n] ?? String(n);
+
+export function describeLabValue(data: LabValueResponse): LabValueCopy {
+  const nowInHundred = Math.round((data.auc_now ?? 0) * 100);
+  const afterInHundred = Math.round((data.auc_after_draw ?? 0) * 100);
+  const missing = data.missing_fields ?? [];
+  // A draw has to change something the model can act on. Below this it is
+  // measurement noise on 45 subjects, and saying "yes" would be selling a test.
+  const worthwhile = (data.score ?? 0) > 0.05 && missing.length > 0;
+
+  if (worthwhile) {
+    const one = missing.length === 1;
+    const count = spell(missing.length);
+    return {
+      verdict: "Yes — a blood test would sharpen this",
+      plain:
+        `${count.charAt(0).toUpperCase()}${count.slice(1)} of the values this ` +
+        `model leans on hardest ${one ? "is" : "are"} not on file, so it is ` +
+        `standing in cohort averages instead. One fasting blood draw would ` +
+        `replace ${one ? "that stand-in" : "those stand-ins"} with your own numbers.`,
+      nowInHundred,
+      afterInHundred,
+      worthwhile,
+    };
+  }
+
+  // Score at or near zero, but the reason differs: either everything useful is
+  // already known, or something is missing and would not move the needle. Those
+  // are different sentences and conflating them overstates the first.
+  if (missing.length > 0) {
+    const one = missing.length === 1;
+    return {
+      verdict: "Not worth drawing again",
+      plain:
+        `There ${one ? "is" : "are"} still ${spell(missing.length)} value` +
+        `${one ? "" : "s"} this model can use that ${one ? "is" : "are"} not on ` +
+        `file, but filling ${one ? "it" : "them"} in would not measurably change ` +
+        `what it can tell you about your meals.`,
+      nowInHundred,
+      afterInHundred,
+      worthwhile,
+    };
+  }
+
+  return {
+    verdict: "No — nothing further to draw",
+    plain:
+      "Every value this model can use is already on file. Drawing again would " +
+      "not improve what it can tell you about your meals.",
+    nowInHundred,
+    afterInHundred,
+    worthwhile,
+  };
+}

@@ -1,18 +1,20 @@
 /**
  * Lab panel + consent gate.
  *
- * Fields come from `/api/fields`, ordered by `importance_rank`, so someone who
- * fills only the first three gets most of the accuracy that is available. Every
- * field is optional; blanks are filled from cohort medians and reported back.
+ * Fields come from `/api/fields` via App, already ordered by `importance_rank`,
+ * so someone who fills only the first three gets most of the accuracy that is
+ * available. Every field is optional; blanks are filled from cohort medians and
+ * reported back.
  */
-import { useEffect, useState } from "react";
-import { getFields } from "../api/client";
+import { useState } from "react";
 import type { Field, LabPanel, Meta } from "../api/client";
 import DemoPersona from "./DemoPersona";
 import type { Persona } from "./DemoPersona";
 
 interface Props {
   meta: Meta;
+  /** From `/api/fields`, already ordered by `importance_rank`. Owned by App. */
+  fields: Field[];
   labs: LabPanel;
   preMealGlucose: number | null;
   onChange: (labs: LabPanel, preMealGlucose: number | null) => void;
@@ -21,21 +23,10 @@ interface Props {
 }
 
 export default function OnboardLabs({
-  meta, labs, preMealGlucose, onChange, consented, onConsent,
+  meta, fields, labs, preMealGlucose, onChange, consented, onConsent,
 }: Props) {
-  const [fields, setFields] = useState<Field[]>([]);
   const [excluded, setExcluded] = useState<Record<string, boolean>>({});
   const [accepted, setAccepted] = useState(false);
-
-  useEffect(() => {
-    getFields()
-      .then((f) =>
-        setFields([...f.fields].sort(
-          (a, b) => (a.importance_rank ?? 99) - (b.importance_rank ?? 99),
-        )),
-      )
-      .catch(() => setFields([]));
-  }, []);
 
   const anyExclusion = Object.values(excluded).some(Boolean);
   const filled = fields.filter((f) => labs[f.name as keyof LabPanel] != null).length;
