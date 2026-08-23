@@ -1,0 +1,20 @@
+# Vercel builds the frontend only; the API is a container on Render.
+#
+# This exists for a second reason beyond upload size: the CLI scans the upload
+# for frameworks, finds serve.py, detects a FastAPI service, and then refuses a
+# root-level buildCommand as ambiguous. Keeping Python out of the upload keeps
+# the detection on Vite, which is the only thing here Vercel actually builds.
+#
+# contract/openapi.json is deliberately NOT ignored: `npm run build` regenerates
+# web/src/api/schema.d.ts from it, which is why the build must run from the repo
+# root rather than from web/.
+*.py
+contract/stub_server.py
+artifacts/
+sundai_cgm/
+build/
+.venv/
+.github/
+Dockerfile
+requirements*.txt
+uv.lock

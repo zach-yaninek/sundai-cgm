@@ -21,3 +21,9 @@ venv/
 # frontend build output and deps (web/ has its own .gitignore too)
 web/node_modules/
 web/dist/
+
+# Added by `vercel link`. Scoped narrower than the .env* it writes by default,
+# which would also hide web/.env.example - a file that is meant to be read.
+.vercel
+.env.local
+.env*.local
