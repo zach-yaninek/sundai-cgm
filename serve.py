@@ -91,6 +91,18 @@ MEAL_RANGES = {
 
 
 def _git_sha() -> str:
+    """The commit this process is serving, reported to the client as model_version.
+
+    Checked in order, because the obvious implementation is wrong in the place
+    it matters most: the serving image excludes `.git/` (see .dockerignore), so
+    shelling out to git inside the container returns nothing and every deployed
+    response would claim version "unknown". Render injects RENDER_GIT_COMMIT;
+    GIT_SHA covers a plain `docker build --build-arg`. Git is the local path.
+    """
+    for var in ("RENDER_GIT_COMMIT", "GIT_SHA"):
+        sha = os.environ.get(var, "").strip()
+        if sha:
+            return sha[:7]
     try:
         return subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=HERE,
                               capture_output=True, text=True, timeout=5).stdout.strip() or "unknown"

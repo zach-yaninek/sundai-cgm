@@ -158,10 +158,34 @@ estimate, built from the model's own SHAP attributions. It labels itself
 path when no `ANTHROPIC_API_KEY` is set, and it is a supported path rather than a
 degraded one.
 
-Deployment: `Dockerfile` + `render.yaml` for the API, `web/` on Vercel with
-`VITE_API_BASE` pointing at it. The serving image is 5.6 MB of code and
-artifacts — it deliberately excludes the training modules, which is why the
-shrinkage maths lives in `shrinkage.py` rather than `personalize.py`.
+## Deploying it
+
+`Dockerfile` + `render.yaml` for the API, `web/` on Vercel. The serving image is
+5.6 MB of code and artifacts — it deliberately excludes the training modules,
+which is why the shrinkage maths lives in `shrinkage.py` rather than
+`personalize.py`.
+
+The two halves have to learn each other's names, and the order matters:
+
+1. Deploy the API on Render from `render.yaml`, and take its URL.
+2. Set `VITE_API_BASE` to that URL on Vercel, and deploy `web/`.
+3. Add the Vercel origin to `ALLOWED_ORIGINS` on Render, and redeploy the API.
+
+Vercel builds from the **repository root**, not from `web/` — see `vercel.json`.
+`npm run build` regenerates the API types from `contract/openapi.json`, which is
+outside `web/`, so a build rooted there cannot see the contract it is generated
+from.
+
+Two things about the deployed instance that are not bugs:
+
+- **The explanation panel narrates locally.** `anthropic` is not in
+  `requirements.txt`, so the SDK is not in the image and `explain.available()`
+  is `False`. The panel labels itself `generated locally` and that is the
+  intended production path. Add the dependency and set `ANTHROPIC_API_KEY` if
+  you want the live one.
+- **Render's free plan sleeps after ~15 minutes idle.** The first request after
+  a quiet period waits 30–60s for a cold start and looks like a hang. Load the
+  API URL yourself a minute before demoing it.
 
 ## Serving
 

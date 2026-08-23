@@ -1,0 +1,21 @@
+# What the API actually imports, and nothing else.
+#
+# serve.py's whole import graph is risk / recommend / explain / shrinkage /
+# sundai_cgm, and between them they need numpy, xgboost and FastAPI. Building
+# the image from requirements.txt instead pulls in pandas, pyarrow, scipy and
+# scikit-learn — the training stack, none of which the container ever imports —
+# and takes the image from ~600 MB to 1.6 GB. On Render's free plan that is
+# build minutes and headroom spent on modules that are never loaded.
+#
+# Keep this in step with requirements.txt: same floors, fewer packages.
+
+numpy>=1.24
+# xgboost 3.1 is a HARD floor, and it forces Python>=3.10. Older xgboost cannot
+# parse the array-valued base_score that 3.1+ writes: it silently defaults to
+# 0.5 and every prediction lands ~53 mg/dL*h low with no error. risk.py checks
+# the loaded base_score against the recorded one and refuses to serve if a
+# version that would mis-read the model somehow gets installed here.
+xgboost>=3.1
+
+fastapi>=0.110
+uvicorn>=0.27

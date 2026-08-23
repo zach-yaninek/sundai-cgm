@@ -1,13 +1,17 @@
 # API image for Render. Deliberately small: xgboost is ~9 MB and the six
 # boosters total 3.7 MB, so there is no need to re-implement tree inference to
 # get a deployable service.
+#
+# Built from requirements-serve.txt, not requirements.txt. The training stack
+# (pandas, pyarrow, scipy, scikit-learn) is never imported by anything the API
+# loads, and installing it anyway roughly triples the image.
 FROM python:3.12-slim
 
 WORKDIR /app
 
 # Dependencies first so a code change does not reinstall the world.
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements-serve.txt ./
+RUN pip install --no-cache-dir -r requirements-serve.txt
 
 # The serving path and the artifacts it reads. Training scripts, tests, the
 # frontend and the CLIP embeddings are excluded by .dockerignore.
