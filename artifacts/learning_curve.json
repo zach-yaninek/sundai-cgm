@@ -1,0 +1,52 @@
+{
+  "target": "iauc",
+  "units": "mg/dL*h",
+  "lambda": 5.0,
+  "method": "leave-one-subject-out; k meals revealed to compute a shrunk offset, scored on that subject's remaining meals",
+  "n_subjects": 39,
+  "min_meals_per_subject": 25,
+  "points": [
+    {
+      "meals_logged": 0,
+      "mae": 28.662,
+      "improvement_pct": 0.0,
+      "shrinkage": 0.0
+    },
+    {
+      "meals_logged": 1,
+      "mae": 26.687,
+      "improvement_pct": 6.9,
+      "shrinkage": 0.167
+    },
+    {
+      "meals_logged": 2,
+      "mae": 25.887,
+      "improvement_pct": 9.7,
+      "shrinkage": 0.286
+    },
+    {
+      "meals_logged": 3,
+      "mae": 25.668,
+      "improvement_pct": 10.4,
+      "shrinkage": 0.375
+    },
+    {
+      "meals_logged": 5,
+      "mae": 24.443,
+      "improvement_pct": 14.7,
+      "shrinkage": 0.5
+    },
+    {
+      "meals_logged": 10,
+      "mae": 23.7,
+      "improvement_pct": 17.3,
+      "shrinkage": 0.667
+    },
+    {
+      "meals_logged": 15,
+      "mae": 23.436,
+      "improvement_pct": 18.2,
+      "shrinkage": 0.75
+    }
+  ]
+}

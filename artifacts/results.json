@@ -429,5 +429,140 @@
         ]
       }
     ]
+  },
+  "rung5": {
+    "n": 1382,
+    "subjects": 45,
+    "threshold_mgdl": 140.0,
+    "exceed_rate": 0.458,
+    "note": "Cold-start only. Two variants; serve.py picks by whether the request carries a pre-meal glucose reading.",
+    "variants": {
+      "with_glucose": {
+        "heads": {
+          "iauc": {
+            "model": "rung5_iauc_with_glucose.json",
+            "base_score": "[4.6174458E1]",
+            "cv_mae": 28.172,
+            "cv_r2": 0.307
+          },
+          "peak_abs": {
+            "model": "rung5_peak_abs_with_glucose.json",
+            "base_score": "[1.4667622E2]",
+            "cv_mae": 22.962,
+            "cv_r2": 0.6465
+          },
+          "exceeds": {
+            "model": "rung5_clf_with_glucose.json",
+            "base_score": "[4.5803183E-1]",
+            "calibrator_method": "isotonic",
+            "cv_auc": 0.8854,
+            "cv_brier": 0.1385,
+            "cv_ece": 0.0371,
+            "cv_average_precision": 0.8706,
+            "calibrator_comparison": {
+              "isotonic": {
+                "ece": 0.0371,
+                "brier": 0.1385,
+                "auc": 0.8854
+              },
+              "platt": {
+                "ece": 0.0521,
+                "brier": 0.1411,
+                "auc": 0.8841
+              }
+            }
+          }
+        }
+      },
+      "no_glucose": {
+        "heads": {
+          "iauc": {
+            "model": "rung5_iauc_no_glucose.json",
+            "base_score": "[4.6174458E1]",
+            "cv_mae": 29.219,
+            "cv_r2": 0.2605
+          },
+          "peak_abs": {
+            "model": "rung5_peak_abs_no_glucose.json",
+            "base_score": "[1.4667622E2]",
+            "cv_mae": 26.694,
+            "cv_r2": 0.5291
+          },
+          "exceeds": {
+            "model": "rung5_clf_no_glucose.json",
+            "base_score": "[4.5803183E-1]",
+            "calibrator_method": "platt",
+            "cv_auc": 0.8358,
+            "cv_brier": 0.1686,
+            "cv_ece": 0.0507,
+            "cv_average_precision": 0.8205,
+            "calibrator_comparison": {
+              "isotonic": {
+                "ece": 0.0824,
+                "brier": 0.1728,
+                "auc": 0.8308
+              },
+              "platt": {
+                "ece": 0.0507,
+                "brier": 0.1686,
+                "auc": 0.8358
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "personalization": {
+    "target": "iauc",
+    "units": "mg/dL*h",
+    "lambda": 5.0,
+    "method": "leave-one-subject-out; k meals revealed to compute a shrunk offset, scored on that subject's remaining meals",
+    "n_subjects": 39,
+    "min_meals_per_subject": 25,
+    "points": [
+      {
+        "meals_logged": 0,
+        "mae": 28.662,
+        "improvement_pct": 0.0,
+        "shrinkage": 0.0
+      },
+      {
+        "meals_logged": 1,
+        "mae": 26.687,
+        "improvement_pct": 6.9,
+        "shrinkage": 0.167
+      },
+      {
+        "meals_logged": 2,
+        "mae": 25.887,
+        "improvement_pct": 9.7,
+        "shrinkage": 0.286
+      },
+      {
+        "meals_logged": 3,
+        "mae": 25.668,
+        "improvement_pct": 10.4,
+        "shrinkage": 0.375
+      },
+      {
+        "meals_logged": 5,
+        "mae": 24.443,
+        "improvement_pct": 14.7,
+        "shrinkage": 0.5
+      },
+      {
+        "meals_logged": 10,
+        "mae": 23.7,
+        "improvement_pct": 17.3,
+        "shrinkage": 0.667
+      },
+      {
+        "meals_logged": 15,
+        "mae": 23.436,
+        "improvement_pct": 18.2,
+        "shrinkage": 0.75
+      }
+    ]
   }
 }

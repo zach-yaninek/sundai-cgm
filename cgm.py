@@ -151,6 +151,10 @@ def timeseries(*, keep_empty: bool = False, sensor: str | None = None) -> pd.Dat
 def meals(*, keep_empty: bool = False, with_photo: bool = False) -> pd.DataFrame:
     """The 1,706 logged meals, one row each, with macros.
 
+    ``amount_consumed`` is present but should not be used as a numeric feature
+    without per-subject rescaling: it mixes percentages, small counts and values
+    up to 900, and the convention varies by subject. See NOTES item 10.
+
     ``with_photo`` adds ``zip_member`` and ``photo_ok``. 1,644 meals carry a
     photo and **all 1,644 resolve** -- the three broken references in the
     published data are all post-meal shots, so no meal loses its image. See
@@ -405,6 +409,17 @@ def bigideas_participants() -> pd.DataFrame:
 #
 # 9. Big Ideas 'amount' is free text on 293 of 1,422 rows; amount_num carries
 #    the numeric ones and is null for the rest.
+#
+# 10. `amount_consumed` mixes three incompatible scales in one column, and the
+#     convention is per-subject. Across 1,642 non-null values: 15 subjects record
+#     what look like percentages (50-100), 8 record small counts (0-9), and 16
+#     have values above 100 running up to 900. The kit README calls it "how much
+#     was actually eaten", which reads as a percentage and is true for only part
+#     of the file. Because the scale is a per-subject habit the column also partly
+#     encodes subject identity, the same trap as meal_type casing. It is left in
+#     the frame -- it is real data and someone may be able to disentangle it per
+#     subject -- but rung5_meal_risk.py excludes it from the feature set, and
+#     doing so *improves* both heads (MAE 28.30 -> 28.17, AUC 0.8871 -> 0.8884).
 #
 # Licences differ between the two studies and it matters commercially:
 # CGMacros is CC BY-NC-SA 4.0 (non-commercial, share-alike) -- Gutierrez-Osuna

@@ -211,6 +211,7 @@ export interface components {
             vldl_cal?: number;
             cho_hdl_ratio?: number;
         };
+        /** @description Macros for the meal as eaten. `amount_consumed` was removed in v1.1: the source column mixes percentages, small counts and values up to 900 with the convention varying per subject, so the model has no coherent portion axis. Enter the macros for the amount actually eaten instead. */
         Meal: {
             /** @description grams */
             carbs: number;
@@ -218,11 +219,6 @@ export interface components {
             fat?: number;
             fiber?: number;
             calories: number;
-            /**
-             * @description percent of the portion actually eaten
-             * @default 100
-             */
-            amount_consumed: number;
             /** @enum {string} */
             meal_type: "breakfast" | "lunch" | "dinner" | "snack";
             /** @description free text, echoed back only */

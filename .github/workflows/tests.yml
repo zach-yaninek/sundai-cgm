@@ -59,10 +59,12 @@ jobs:
         run: python test_cgm.py
       - name: Run the serving round-trip test
         run: python test_predict.py
-      - name: Validate the API contract
+      - name: Run the rung-5 / recommender / personalisation tests
+        run: python test_rung5.py
+      - name: Validate the API contract, stub and real backend
         run: |
           python -m pip install --quiet fastapi httpx jsonschema
-          python test_contract.py
+          python test_contract.py --real
 
   # The floor in requirements.txt is a claim; this checks it is true.
   oldest-deps:

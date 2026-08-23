@@ -78,6 +78,33 @@ EXCLUSIONS = [
 ]
 
 
+MEAL_RANGES = {"carbs": (0, 800), "protein": (0, 400), "fat": (0, 400),
+               "fiber": (0, 100), "calories": (0, 4000)}
+
+
+def _validate(labs: dict, meal: dict, pre: float | None) -> str | None:
+    """Same refusals as the real backend, so the frontend builds the error path.
+
+    A stub that accepts everything teaches the UI that bad input never fails,
+    and the validation states go unbuilt until the real backend starts rejecting
+    things in front of an audience.
+    """
+    ranges = {f[0]: (f[3], f[4]) for f in FIELDS}
+    for name, value in (labs or {}).items():
+        if name not in ranges:
+            return f"unknown lab field {name!r}"
+        lo, hi = ranges[name]
+        if value is not None and not (lo <= float(value) <= hi):
+            return f"{name} is {value}, outside the plausible range {lo}-{hi}"
+    for name, (lo, hi) in MEAL_RANGES.items():
+        value = (meal or {}).get(name)
+        if value is not None and not (lo <= float(value) <= hi):
+            return f"meal.{name} is {value}, outside the plausible range {lo}-{hi}"
+    if pre is not None and not (40 <= float(pre) <= 400):
+        return f"pre_meal_glucose is {pre}, outside the plausible range 40-400"
+    return None
+
+
 def _meta() -> dict[str, Any]:
     return {
         "model_version": STUB_VERSION,
@@ -90,17 +117,17 @@ def _meta() -> dict[str, Any]:
         },
         "thresholds": {"exceed_mgdl": 140, "cohort_exceed_rate": 0.458},
         "performance": {
-            "auc_with_glucose": 0.888,
-            "auc_without_glucose": 0.841,
-            "mae_iauc": 28.0,
+            "auc_with_glucose": 0.8854,
+            "auc_without_glucose": 0.8358,
+            "mae_iauc": 28.172,
             "learning_curve": [
-                {"meals_logged": 0, "mae": 28.41},
-                {"meals_logged": 1, "mae": 26.71},
-                {"meals_logged": 2, "mae": 25.90},
-                {"meals_logged": 3, "mae": 25.73},
-                {"meals_logged": 5, "mae": 24.51},
-                {"meals_logged": 10, "mae": 23.82},
-                {"meals_logged": 15, "mae": 23.68},
+                {"meals_logged": 0, "mae": 28.662},
+                {"meals_logged": 1, "mae": 26.687},
+                {"meals_logged": 2, "mae": 25.887},
+                {"meals_logged": 3, "mae": 25.668},
+                {"meals_logged": 5, "mae": 24.443},
+                {"meals_logged": 10, "mae": 23.7},
+                {"meals_logged": 15, "mae": 23.436},
             ],
         },
         "disclaimer": {"id": "v1", "text": DISCLAIMER, "must_accept": True},
@@ -118,7 +145,7 @@ def _risk(labs: dict, meal: dict, pre: float | None) -> tuple[float, float]:
     """A crude stand-in that moves in the directions the real model moves."""
     carbs = float(meal.get("carbs") or 0)
     fiber = float(meal.get("fiber") or 0)
-    eaten = float(meal.get("amount_consumed") or 100) / 100.0
+    eaten = 1.0
     a1c = float(labs.get("a1c_pdl_lab") or 5.5)
     glu = float(labs.get("fasting_glu___pdl_lab") or 97)
     ins = float(labs.get("insulin") or 9.4)
@@ -202,6 +229,11 @@ def assess(body: dict):
                      "detail": "carbs, calories and meal_type are required",
                      "field": "meal"},
         )
+    problem = _validate(labs, meal, pre)
+    if problem:
+        return JSONResponse(status_code=422,
+                            content={"error": "invalid_request",
+                                     "detail": problem, "field": None})
 
     probability, peak = _risk(labs, meal, pre)
     personal = _personalization(history)
@@ -235,6 +267,12 @@ def alternatives(body: dict):
     history = body.get("history") or []
     target = float(body.get("target_probability", 0.4))
 
+    problem = _validate(labs, meal, pre)
+    if problem:
+        return JSONResponse(status_code=422,
+                            content={"error": "invalid_request",
+                                     "detail": problem, "field": None})
+
     base_p, _ = _risk(labs, meal, pre)
     carbs = float(meal.get("carbs") or 0)
 
@@ -242,13 +280,13 @@ def alternatives(body: dict):
         ("About a quarter less carbohydrate", {"carbs": -round(carbs * 0.25, 1)}),
         ("Add 10 g of fiber", {"fiber": 10}),
         ("About a third less carbohydrate", {"carbs": -round(carbs * 0.33, 1)}),
-        ("Eat three quarters of the portion", {"amount_consumed": -25}),
         ("Half the carbohydrate", {"carbs": -round(carbs * 0.5, 1)}),
     ]
 
     edits = []
+    known = ("carbs", "protein", "fat", "fiber", "calories", "meal_type", "label")
     for description, changes in candidates:
-        variant = dict(meal)
+        variant = {k: v for k, v in meal.items() if k in known}
         for key, delta in changes.items():
             variant[key] = max(0.0, float(variant.get(key) or 0) + delta)
         p, peak = _risk(labs, variant, pre)

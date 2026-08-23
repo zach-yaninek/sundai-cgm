@@ -2,12 +2,17 @@
   "openapi": "3.1.0",
   "info": {
     "title": "sundai-cgm meal risk API",
-    "version": "1.0.0",
-    "description": "Assess a meal's likely glucose response for one person, suggest changes that lower it, and improve as that person logs meals.\n\nThe server is STATELESS. The client holds the lab panel and the meal history in browser localStorage and sends what is needed on each request; no personal health data is stored server-side.\n\nEvery number here comes from a model fitted to 45 people in one study (CGMacros, PhysioNet 2025). Cold-start AUC for the >140 mg/dL flag is 0.888 with a pre-meal glucose reading and 0.841 without. This is not a medical device and must not be used to inform an insulin dose.",
-    "license": {"name": "MIT (code); data CC BY-NC-SA 4.0"}
+    "version": "1.1.0",
+    "description": "Assess a meal's likely glucose response for one person, suggest changes that lower it, and improve as that person logs meals.\n\nThe server is STATELESS. The client holds the lab panel and the meal history in browser localStorage and sends what is needed on each request; no personal health data is stored server-side.\n\nEvery number here comes from a model fitted to 45 people in one study (CGMacros, PhysioNet 2025). Cold-start AUC for the >140 mg/dL flag is 0.8854 with a pre-meal glucose reading and 0.8358 without. This is not a medical device and must not be used to inform an insulin dose.",
+    "license": {
+      "name": "MIT (code); data CC BY-NC-SA 4.0"
+    }
   },
   "servers": [
-    {"url": "http://localhost:8000", "description": "local dev — stub or real backend"}
+    {
+      "url": "http://localhost:8000",
+      "description": "local dev \u2014 stub or real backend"
+    }
   ],
   "paths": {
     "/api/meta": {
@@ -17,7 +22,13 @@
         "responses": {
           "200": {
             "description": "OK",
-            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Meta"}}}
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Meta"
+                }
+              }
+            }
           }
         }
       }
@@ -25,11 +36,17 @@
     "/api/fields": {
       "get": {
         "summary": "Lab fields the model uses, with units and plausible ranges",
-        "description": "Drives the onboarding form. Every field is optional — missing values fall back to cohort medians and are reported back in `confidence.imputed_fields`.",
+        "description": "Drives the onboarding form. Every field is optional \u2014 missing values fall back to cohort medians and are reported back in `confidence.imputed_fields`.",
         "responses": {
           "200": {
             "description": "OK",
-            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/FieldList"}}}
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FieldList"
+                }
+              }
+            }
           }
         }
       }
@@ -39,16 +56,34 @@
         "summary": "Assess one meal for one person",
         "requestBody": {
           "required": true,
-          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AssessRequest"}}}
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssessRequest"
+              }
+            }
+          }
         },
         "responses": {
           "200": {
             "description": "OK",
-            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AssessResponse"}}}
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssessResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Unknown field, or a value outside its plausible range",
-            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -59,16 +94,34 @@
         "description": "Returns interpretable single-axis edits to the meal the user entered, smallest effective change first. If `history` is supplied, the user's own previously-logged low-response meals of the same type are returned alongside.\n\nThere is deliberately no catalog of study meals: the source dataset is share-alike licensed and is not redistributed by this project.",
         "requestBody": {
           "required": true,
-          "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AlternativesRequest"}}}
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AlternativesRequest"
+              }
+            }
+          }
         },
         "responses": {
           "200": {
             "description": "OK",
-            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/AlternativesResponse"}}}
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AlternativesResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Unknown field, or a value outside its plausible range",
-            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}}
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }
@@ -81,106 +134,258 @@
         "description": "Fasting lab panel. Every field optional; medians fill the gaps and the response says which were filled.",
         "additionalProperties": false,
         "properties": {
-          "age": {"type": "number", "minimum": 18, "maximum": 100},
-          "bmi": {"type": "number", "minimum": 12, "maximum": 70},
-          "body_weight": {"type": "number", "description": "pounds"},
-          "height": {"type": "number", "description": "inches"},
-          "a1c_pdl_lab": {"type": "number", "minimum": 3, "maximum": 15, "description": "HbA1c %"},
-          "fasting_glu___pdl_lab": {"type": "number", "minimum": 40, "maximum": 400, "description": "mg/dL"},
-          "insulin": {"type": "number", "minimum": 0, "maximum": 300, "description": "uIU/mL"},
-          "triglycerides": {"type": "number", "minimum": 10, "maximum": 2000},
-          "cholesterol": {"type": "number", "minimum": 50, "maximum": 500},
-          "hdl": {"type": "number", "minimum": 10, "maximum": 150},
-          "non_hdl": {"type": "number", "minimum": 10, "maximum": 400},
-          "ldl_cal": {"type": "number", "minimum": 10, "maximum": 400},
-          "vldl_cal": {"type": "number", "minimum": 1, "maximum": 200},
-          "cho_hdl_ratio": {"type": "number", "minimum": 0.5, "maximum": 20}
+          "age": {
+            "type": "number",
+            "minimum": 18,
+            "maximum": 100
+          },
+          "bmi": {
+            "type": "number",
+            "minimum": 12,
+            "maximum": 70
+          },
+          "body_weight": {
+            "type": "number",
+            "description": "pounds"
+          },
+          "height": {
+            "type": "number",
+            "description": "inches"
+          },
+          "a1c_pdl_lab": {
+            "type": "number",
+            "minimum": 3,
+            "maximum": 15,
+            "description": "HbA1c %"
+          },
+          "fasting_glu___pdl_lab": {
+            "type": "number",
+            "minimum": 40,
+            "maximum": 400,
+            "description": "mg/dL"
+          },
+          "insulin": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 300,
+            "description": "uIU/mL"
+          },
+          "triglycerides": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 2000
+          },
+          "cholesterol": {
+            "type": "number",
+            "minimum": 50,
+            "maximum": 500
+          },
+          "hdl": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 150
+          },
+          "non_hdl": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 400
+          },
+          "ldl_cal": {
+            "type": "number",
+            "minimum": 10,
+            "maximum": 400
+          },
+          "vldl_cal": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "cho_hdl_ratio": {
+            "type": "number",
+            "minimum": 0.5,
+            "maximum": 20
+          }
         }
       },
       "Meal": {
         "type": "object",
-        "required": ["carbs", "calories", "meal_type"],
+        "required": [
+          "carbs",
+          "calories",
+          "meal_type"
+        ],
         "additionalProperties": false,
         "properties": {
-          "carbs": {"type": "number", "minimum": 0, "maximum": 800, "description": "grams"},
-          "protein": {"type": "number", "minimum": 0, "maximum": 400},
-          "fat": {"type": "number", "minimum": 0, "maximum": 400},
-          "fiber": {"type": "number", "minimum": 0, "maximum": 100},
-          "calories": {"type": "number", "minimum": 0, "maximum": 4000},
-          "amount_consumed": {
-            "type": "number", "minimum": 0, "maximum": 100, "default": 100,
-            "description": "percent of the portion actually eaten"
+          "carbs": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 800,
+            "description": "grams"
           },
-          "meal_type": {"type": "string", "enum": ["breakfast", "lunch", "dinner", "snack"]},
-          "label": {"type": "string", "description": "free text, echoed back only"}
-        }
+          "protein": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 400
+          },
+          "fat": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 400
+          },
+          "fiber": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "calories": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 4000
+          },
+          "meal_type": {
+            "type": "string",
+            "enum": [
+              "breakfast",
+              "lunch",
+              "dinner",
+              "snack"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "description": "free text, echoed back only"
+          }
+        },
+        "description": "Macros for the meal as eaten. `amount_consumed` was removed in v1.1: the source column mixes percentages, small counts and values up to 900 with the convention varying per subject, so the model has no coherent portion axis. Enter the macros for the amount actually eaten instead."
       },
       "HistoryEntry": {
         "type": "object",
-        "required": ["meal"],
+        "required": [
+          "meal"
+        ],
         "description": "One previously logged meal and what actually happened. Held client-side.",
         "properties": {
-          "meal": {"$ref": "#/components/schemas/Meal"},
-          "pre_meal_glucose": {"type": "number", "nullable": true},
-          "observed_peak": {"type": "number", "nullable": true, "description": "mg/dL"},
-          "observed_iauc": {"type": "number", "nullable": true, "description": "mg/dL*h"},
-          "logged_at": {"type": "string", "format": "date-time"}
+          "meal": {
+            "$ref": "#/components/schemas/Meal"
+          },
+          "pre_meal_glucose": {
+            "type": "number",
+            "nullable": true
+          },
+          "observed_peak": {
+            "type": "number",
+            "nullable": true,
+            "description": "mg/dL"
+          },
+          "observed_iauc": {
+            "type": "number",
+            "nullable": true,
+            "description": "mg/dL*h"
+          },
+          "logged_at": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "AssessRequest": {
         "type": "object",
-        "required": ["labs", "meal"],
+        "required": [
+          "labs",
+          "meal"
+        ],
         "properties": {
-          "labs": {"$ref": "#/components/schemas/LabPanel"},
-          "meal": {"$ref": "#/components/schemas/Meal"},
+          "labs": {
+            "$ref": "#/components/schemas/LabPanel"
+          },
+          "meal": {
+            "$ref": "#/components/schemas/Meal"
+          },
           "pre_meal_glucose": {
-            "type": "number", "nullable": true, "minimum": 40, "maximum": 400,
+            "type": "number",
+            "nullable": true,
+            "minimum": 40,
+            "maximum": 400,
             "description": "mg/dL. Optional. Raises flag AUC from 0.841 to 0.888."
           },
           "history": {
-            "type": "array", "items": {"$ref": "#/components/schemas/HistoryEntry"},
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            },
             "default": []
           }
         }
       },
       "RiskFlag": {
         "type": "object",
-        "required": ["threshold_mgdl", "probability", "cohort_percentile"],
+        "required": [
+          "threshold_mgdl",
+          "probability",
+          "cohort_percentile"
+        ],
         "properties": {
-          "threshold_mgdl": {"type": "number", "const": 140},
+          "threshold_mgdl": {
+            "type": "number",
+            "const": 140
+          },
           "probability": {
-            "type": "number", "minimum": 0, "maximum": 1,
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
             "description": "Calibrated probability that peak glucose exceeds the threshold."
           },
           "cohort_percentile": {
-            "type": "integer", "minimum": 0, "maximum": 100,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
             "description": "Where this sits among the 1,382 cohort meals. 80 means higher than 80% of them."
           },
           "operating_point": {
-            "type": "string", "enum": ["recall_weighted"],
+            "type": "string",
+            "enum": [
+              "recall_weighted"
+            ],
             "description": "Tuned for recall on the exceed class: a false 'low' is the expensive error."
           }
         }
       },
       "CurvePoint": {
         "type": "object",
-        "required": ["minute", "delta"],
+        "required": [
+          "minute",
+          "delta"
+        ],
         "properties": {
-          "minute": {"type": "integer"},
-          "delta": {"type": "number", "description": "mg/dL above the pre-meal baseline"}
+          "minute": {
+            "type": "integer"
+          },
+          "delta": {
+            "type": "number",
+            "description": "mg/dL above the pre-meal baseline"
+          }
         }
       },
       "Personalization": {
         "type": "object",
-        "required": ["meals_logged", "offset_applied", "shrinkage"],
+        "required": [
+          "meals_logged",
+          "offset_applied",
+          "shrinkage"
+        ],
         "properties": {
-          "meals_logged": {"type": "integer", "minimum": 0},
+          "meals_logged": {
+            "type": "integer",
+            "minimum": 0
+          },
           "offset_applied": {
             "type": "number",
             "description": "mg/dL*h added to the population prediction for this person."
           },
           "shrinkage": {
-            "type": "number", "minimum": 0, "maximum": 1,
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
             "description": "k/(k+5). At 0 the prediction is purely population-level."
           },
           "expected_mae": {
@@ -191,155 +396,333 @@
       },
       "Confidence": {
         "type": "object",
-        "required": ["band", "imputed_fields"],
+        "required": [
+          "band",
+          "imputed_fields"
+        ],
         "properties": {
           "band": {
-            "type": "string", "enum": ["narrow", "moderate", "wide"],
+            "type": "string",
+            "enum": [
+              "narrow",
+              "moderate",
+              "wide"
+            ],
             "description": "Widens with imputed lab fields and no pre-meal glucose. A wide band must LOOK wide in the UI."
           },
-          "imputed_fields": {"type": "array", "items": {"type": "string"}},
-          "used_pre_meal_glucose": {"type": "boolean"}
+          "imputed_fields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "used_pre_meal_glucose": {
+            "type": "boolean"
+          }
         }
       },
       "AssessResponse": {
         "type": "object",
-        "required": ["exceeds_140", "predicted_peak_mgdl", "predicted_iauc", "curve",
-                     "personalization", "confidence", "model_version", "disclaimer_id"],
+        "required": [
+          "exceeds_140",
+          "predicted_peak_mgdl",
+          "predicted_iauc",
+          "curve",
+          "personalization",
+          "confidence",
+          "model_version",
+          "disclaimer_id"
+        ],
         "properties": {
-          "exceeds_140": {"$ref": "#/components/schemas/RiskFlag"},
-          "predicted_peak_mgdl": {"type": "number"},
-          "predicted_iauc": {"type": "number", "minimum": 0, "description": "mg/dL*h over 120 min"},
-          "curve": {"type": "array", "items": {"$ref": "#/components/schemas/CurvePoint"}},
-          "curve_note": {"type": "string"},
-          "personalization": {"$ref": "#/components/schemas/Personalization"},
-          "confidence": {"$ref": "#/components/schemas/Confidence"},
-          "model_version": {"type": "string"},
-          "disclaimer_id": {"type": "string"}
+          "exceeds_140": {
+            "$ref": "#/components/schemas/RiskFlag"
+          },
+          "predicted_peak_mgdl": {
+            "type": "number"
+          },
+          "predicted_iauc": {
+            "type": "number",
+            "minimum": 0,
+            "description": "mg/dL*h over 120 min"
+          },
+          "curve": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CurvePoint"
+            }
+          },
+          "curve_note": {
+            "type": "string"
+          },
+          "personalization": {
+            "$ref": "#/components/schemas/Personalization"
+          },
+          "confidence": {
+            "$ref": "#/components/schemas/Confidence"
+          },
+          "model_version": {
+            "type": "string"
+          },
+          "disclaimer_id": {
+            "type": "string"
+          }
         }
       },
       "AlternativesRequest": {
         "type": "object",
-        "required": ["labs", "meal"],
+        "required": [
+          "labs",
+          "meal"
+        ],
         "properties": {
-          "labs": {"$ref": "#/components/schemas/LabPanel"},
-          "meal": {"$ref": "#/components/schemas/Meal"},
-          "pre_meal_glucose": {"type": "number", "nullable": true},
-          "history": {"type": "array", "items": {"$ref": "#/components/schemas/HistoryEntry"}, "default": []},
+          "labs": {
+            "$ref": "#/components/schemas/LabPanel"
+          },
+          "meal": {
+            "$ref": "#/components/schemas/Meal"
+          },
+          "pre_meal_glucose": {
+            "type": "number",
+            "nullable": true
+          },
+          "history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryEntry"
+            },
+            "default": []
+          },
           "target_probability": {
-            "type": "number", "minimum": 0, "maximum": 1, "default": 0.4,
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 0.4,
             "description": "Stop searching once an edit gets the probability below this."
           }
         }
       },
       "Edit": {
         "type": "object",
-        "required": ["description", "changes", "probability", "delta_probability"],
+        "required": [
+          "description",
+          "changes",
+          "probability",
+          "delta_probability"
+        ],
         "properties": {
-          "description": {"type": "string", "example": "About a third less carbohydrate"},
+          "description": {
+            "type": "string",
+            "example": "About a third less carbohydrate"
+          },
           "changes": {
             "type": "object",
             "description": "Field-level deltas applied to the original meal.",
-            "additionalProperties": {"type": "number"}
+            "additionalProperties": {
+              "type": "number"
+            }
           },
-          "resulting_meal": {"$ref": "#/components/schemas/Meal"},
-          "probability": {"type": "number", "minimum": 0, "maximum": 1},
+          "resulting_meal": {
+            "$ref": "#/components/schemas/Meal"
+          },
+          "probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
           "delta_probability": {
             "type": "number",
             "description": "Negative means lower risk than the original. Only edits that lower it are returned."
           },
-          "predicted_peak_mgdl": {"type": "number"}
+          "predicted_peak_mgdl": {
+            "type": "number"
+          }
         }
       },
       "PastMeal": {
         "type": "object",
         "description": "One of the user's OWN previously logged meals that went well. Never a study meal.",
-        "required": ["meal", "observed_peak"],
+        "required": [
+          "meal",
+          "observed_peak"
+        ],
         "properties": {
-          "meal": {"$ref": "#/components/schemas/Meal"},
-          "observed_peak": {"type": "number"},
-          "observed_iauc": {"type": "number"},
-          "logged_at": {"type": "string", "format": "date-time"}
+          "meal": {
+            "$ref": "#/components/schemas/Meal"
+          },
+          "observed_peak": {
+            "type": "number"
+          },
+          "observed_iauc": {
+            "type": "number"
+          },
+          "logged_at": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "AlternativesResponse": {
         "type": "object",
-        "required": ["original", "edits", "from_your_history", "model_version"],
+        "required": [
+          "original",
+          "edits",
+          "from_your_history",
+          "model_version"
+        ],
         "properties": {
-          "original": {"$ref": "#/components/schemas/RiskFlag"},
+          "original": {
+            "$ref": "#/components/schemas/RiskFlag"
+          },
           "edits": {
-            "type": "array", "items": {"$ref": "#/components/schemas/Edit"},
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Edit"
+            },
             "description": "Smallest effective change first. Empty when the meal is already low risk."
           },
           "from_your_history": {
-            "type": "array", "items": {"$ref": "#/components/schemas/PastMeal"},
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PastMeal"
+            },
             "description": "Empty until the user has logged meals of this type."
           },
-          "note": {"type": "string"},
-          "model_version": {"type": "string"}
+          "note": {
+            "type": "string"
+          },
+          "model_version": {
+            "type": "string"
+          }
         }
       },
       "Field": {
         "type": "object",
-        "required": ["name", "label", "unit", "optional"],
+        "required": [
+          "name",
+          "label",
+          "unit",
+          "optional"
+        ],
         "properties": {
-          "name": {"type": "string"},
-          "label": {"type": "string"},
-          "unit": {"type": "string"},
-          "optional": {"type": "boolean"},
-          "min": {"type": "number"},
-          "max": {"type": "number"},
-          "cohort_median": {"type": "number", "description": "Used when the field is left blank."},
-          "importance_rank": {"type": "integer", "description": "1 = strongest predictor. Order the form by this."}
+          "name": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string"
+          },
+          "optional": {
+            "type": "boolean"
+          },
+          "min": {
+            "type": "number"
+          },
+          "max": {
+            "type": "number"
+          },
+          "cohort_median": {
+            "type": "number",
+            "description": "Used when the field is left blank."
+          },
+          "importance_rank": {
+            "type": "integer",
+            "description": "1 = strongest predictor. Order the form by this."
+          }
         }
       },
       "FieldList": {
         "type": "object",
-        "required": ["fields", "derived"],
+        "required": [
+          "fields",
+          "derived"
+        ],
         "properties": {
-          "fields": {"type": "array", "items": {"$ref": "#/components/schemas/Field"}},
+          "fields": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Field"
+            }
+          },
           "derived": {
             "type": "object",
             "description": "Computed server-side, never asked for.",
-            "additionalProperties": {"type": "string"}
+            "additionalProperties": {
+              "type": "string"
+            }
           }
         }
       },
       "Meta": {
         "type": "object",
-        "required": ["model_version", "cohort", "thresholds", "performance", "disclaimer", "exclusions"],
+        "required": [
+          "model_version",
+          "cohort",
+          "thresholds",
+          "performance",
+          "disclaimer",
+          "exclusions"
+        ],
         "properties": {
-          "model_version": {"type": "string"},
+          "model_version": {
+            "type": "string"
+          },
           "cohort": {
             "type": "object",
             "properties": {
-              "n_subjects": {"type": "integer"},
-              "n_meals": {"type": "integer"},
-              "age_range": {"type": "string"},
-              "source": {"type": "string"},
-              "citation": {"type": "string"}
+              "n_subjects": {
+                "type": "integer"
+              },
+              "n_meals": {
+                "type": "integer"
+              },
+              "age_range": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "citation": {
+                "type": "string"
+              }
             }
           },
           "thresholds": {
             "type": "object",
             "properties": {
-              "exceed_mgdl": {"type": "number"},
-              "cohort_exceed_rate": {"type": "number"}
+              "exceed_mgdl": {
+                "type": "number"
+              },
+              "cohort_exceed_rate": {
+                "type": "number"
+              }
             }
           },
           "performance": {
             "type": "object",
             "description": "Cold-start, subject-grouped cross-validation. Display these; do not hardcode.",
             "properties": {
-              "auc_with_glucose": {"type": "number"},
-              "auc_without_glucose": {"type": "number"},
-              "mae_iauc": {"type": "number"},
+              "auc_with_glucose": {
+                "type": "number"
+              },
+              "auc_without_glucose": {
+                "type": "number"
+              },
+              "mae_iauc": {
+                "type": "number"
+              },
               "learning_curve": {
                 "type": "array",
                 "items": {
                   "type": "object",
                   "properties": {
-                    "meals_logged": {"type": "integer"},
-                    "mae": {"type": "number"}
+                    "meals_logged": {
+                      "type": "integer"
+                    },
+                    "mae": {
+                      "type": "number"
+                    }
                   }
                 }
               }
@@ -348,25 +731,43 @@
           "disclaimer": {
             "type": "object",
             "properties": {
-              "id": {"type": "string"},
-              "text": {"type": "string"},
-              "must_accept": {"type": "boolean"}
+              "id": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              },
+              "must_accept": {
+                "type": "boolean"
+              }
             }
           },
           "exclusions": {
             "type": "array",
-            "items": {"type": "string"},
+            "items": {
+              "type": "string"
+            },
             "description": "Conditions under which the app must refuse to give a reading. Enforce at onboarding, not in fine print."
           }
         }
       },
       "Error": {
         "type": "object",
-        "required": ["error", "detail"],
+        "required": [
+          "error",
+          "detail"
+        ],
         "properties": {
-          "error": {"type": "string"},
-          "detail": {"type": "string"},
-          "field": {"type": "string", "nullable": true}
+          "error": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "field": {
+            "type": "string",
+            "nullable": true
+          }
         }
       }
     }

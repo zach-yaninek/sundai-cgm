@@ -52,7 +52,7 @@ LABS_FULL = {
 }
 LABS_SPARSE = {"a1c_pdl_lab": 5.2, "fasting_glu___pdl_lab": 88}
 MEAL = {"carbs": 66, "protein": 20, "fat": 18, "fiber": 4,
-        "calories": 712, "meal_type": "dinner", "amount_consumed": 100}
+        "calories": 712, "meal_type": "dinner"}
 
 
 def check(client, name):
@@ -117,6 +117,17 @@ def check(client, name):
     bad = client.post("/api/assess", json={"labs": {}, "meal": {"carbs": 10}})
     ok(bad.status_code == 422, f"{name}: a meal missing meal_type is refused (422)")
     validate(bad.json(), "Error", f"{name} error body")
+
+    # A typo'd 660 for 66 must be refused, not scored. A model will happily
+    # return a confident number for an impossible meal.
+    typo = client.post("/api/assess", json={"labs": LABS_FULL,
+                                            "meal": {**MEAL, "carbs": 6600}})
+    ok(typo.status_code == 422, f"{name}: an out-of-range macro is refused (422)")
+
+    # No returned meal may carry a field the contract does not define.
+    allowed = set(SPEC["components"]["schemas"]["Meal"]["properties"])
+    extra = {k for e in alts["edits"] for k in e.get("resulting_meal", {})} - allowed
+    ok(not extra, f"{name}: edits echo no undefined meal fields (found {sorted(extra)})")
 
 
 print("contract:", SPEC["info"]["title"], SPEC["info"]["version"])
